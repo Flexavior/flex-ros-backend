@@ -5,6 +5,7 @@ namespace App\Domain\Inbox;
 use App\Models\Conversation;
 use App\Models\ConversationEvent;
 use App\Models\ConversationMessage;
+use App\Models\Setting;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -189,6 +190,105 @@ class ConversationIngestService
         return $stats;
     }
 
+    /**
+     * Apply an ownership change performed inside the gateway UI (ConvyMes) to the CRM mirror.
+     *
+     * Idempotent: a replayed event, or an echo of a CRM-initiated assignment, changes nothing.
+     * Unmapped gateway agents are ignored rather than guessed.
+     *
+     * @param  array<string,mixed>  $conversationPayload  gateway conversation fields
+     * @return array{handled: bool, reason: string, owner_id: ?int, conversation: Conversation}
+     */
+    public function applyGatewayAssignment(array $conversationPayload, mixed $gatewayAgentId, array $meta = []): array
+    {
+        $conversation = $this->ingestConversation($conversationPayload + ['source' => 'webhook']);
+
+        $hasAgent = !($gatewayAgentId === null || $gatewayAgentId === '');
+        $userId = $hasAgent ? $this->crmUserIdForGatewayAgent($gatewayAgentId) : null;
+
+        if ($hasAgent && $userId === null) {
+            return [
+                'handled' => false,
+                'reason' => 'agent_not_mapped',
+                'owner_id' => null,
+                'conversation' => $conversation,
+            ];
+        }
+
+        if ($conversation->owner_id === $userId) {
+            return [
+                'handled' => false,
+                'reason' => 'already_owner',
+                'owner_id' => $userId,
+                'conversation' => $conversation,
+            ];
+        }
+
+        $previousOwner = $conversation->owner_id;
+
+        DB::transaction(function () use ($conversation, $userId, $gatewayAgentId, $previousOwner, $meta) {
+            $conversation->fill([
+                'owner_id' => $userId,
+                'claimed_at' => $userId ? ($conversation->claimed_at ?: now()) : null,
+                'status' => $userId
+                    ? ($conversation->status === Conversation::STATUS_CLOSED ? Conversation::STATUS_OPEN : $conversation->status)
+                    : Conversation::STATUS_UNASSIGNED,
+            ])->save();
+
+            ConversationEvent::create([
+                'conversation_id' => $conversation->id,
+                'type' => $this->assignmentEventType($previousOwner, $userId),
+                'actor_id' => null,
+                'from_owner_id' => $previousOwner,
+                'to_owner_id' => $userId,
+                'meta' => array_merge($meta, [
+                    'source' => 'gateway',
+                    'gateway_agent_id' => $gatewayAgentId,
+                ]),
+            ]);
+        });
+
+        $this->broadcast->notify($conversation->id, 'ownership');
+
+        return [
+            'handled' => true,
+            'reason' => $this->assignmentEventType($previousOwner, $userId),
+            'owner_id' => $userId,
+            'conversation' => $conversation,
+        ];
+    }
+
+    /** Same vocabulary as the CRM-initiated lifecycle: assigned / reassigned / released. */
+    protected function assignmentEventType(?int $previousOwner, ?int $newOwner): string
+    {
+        if ($newOwner === null) {
+            return ConversationEvent::TYPE_RELEASED;
+        }
+
+        return $previousOwner === null ? ConversationEvent::TYPE_ASSIGNED : ConversationEvent::TYPE_REASSIGNED;
+    }
+
+    /** Reverse of ConversationService::gatewayAgentId(): gateway agent id → CRM user id. */
+    protected function crmUserIdForGatewayAgent(mixed $gatewayAgentId): ?int
+    {
+        if ($gatewayAgentId === null || $gatewayAgentId === '') {
+            return null;
+        }
+
+        $map = Setting::get('integrations.convymes.agent_map', []);
+        if (!is_array($map)) {
+            return null;
+        }
+
+        foreach ($map as $crmUserId => $mappedAgentId) {
+            if ((string) $mappedAgentId === (string) $gatewayAgentId) {
+                return (int) $crmUserId;
+            }
+        }
+
+        return null;
+    }
+
     /** Gateway channel codes map 1:1; unknown channels are kept verbatim for forward compatibility. */
     public function normalizeChannel(?string $channel): string
     {
@@ -198,6 +298,7 @@ class ConversationIngestService
             'fb', 'facebook', 'messenger', 'facebook_messenger' => Conversation::CHANNEL_FACEBOOK,
             'viber', 'viber_business' => Conversation::CHANNEL_VIBER,
             'line', 'line_official' => Conversation::CHANNEL_LINE,
+            'outlook', 'office365', 'o365', 'microsoft_mail', 'email' => Conversation::CHANNEL_OUTLOOK,
             '' => 'unknown',
             default => $channel,
         };

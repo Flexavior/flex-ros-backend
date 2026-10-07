@@ -23,6 +23,7 @@ class ConvymesWebhookController extends Controller
 
         return match ($event) {
             'message:in', 'message:out' => $this->handleMessage($ingest, $payload),
+            'conversation:assigned' => $this->handleAssignment($ingest, $payload),
             default => response()->json(['ok' => true, 'ignored' => $event ?: 'unknown']),
         };
     }
@@ -60,6 +61,43 @@ class ConvymesWebhookController extends Controller
             'ok' => true,
             'stored' => $stored !== null,
             'message_id' => $stored?->id,
+        ]);
+    }
+
+    /**
+     * Gateway-side ownership change (ConvyMes `conversation:assigned`).
+     * Always answers 200 (except for structurally invalid payloads) so the relay never retries forever.
+     */
+    protected function handleAssignment(ConversationIngestService $ingest, array $payload): Response
+    {
+        $conversation = $payload['conversation'] ?? [];
+
+        if (empty($conversation['id'])) {
+            return response()->json(['ok' => false, 'error' => 'Invalid assignment payload'], 422);
+        }
+
+        $result = $ingest->applyGatewayAssignment(
+            conversationPayload: [
+                'channel' => $conversation['channel'] ?? 'unknown',
+                'external_id' => (string) $conversation['id'],
+                'customer_ref' => $conversation['customerId'] ?? null,
+                'customer_name' => $conversation['customerName'] ?? null,
+                'status' => $conversation['status'] ?? null,
+            ],
+            gatewayAgentId: $conversation['assignedTo'] ?? null,
+            meta: [
+                'gateway_event' => 'conversation:assigned',
+                'previous_gateway_agent_id' => $payload['previousAssignedTo'] ?? null,
+                'gateway_actor_id' => $payload['assignedBy'] ?? null,
+            ],
+        );
+
+        return response()->json([
+            'ok' => true,
+            'stored' => $result['handled'],
+            'reason' => $result['reason'],
+            'owner_id' => $result['owner_id'],
+            'conversation_id' => $result['conversation']->id,
         ]);
     }
 

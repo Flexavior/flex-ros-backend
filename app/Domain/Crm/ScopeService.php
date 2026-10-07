@@ -73,6 +73,27 @@ class ScopeService
         return in_array($lead->owner_id, $visibleOwnerIds) || $lead->created_by === $user->id;
     }
 
+    /** Can the user view/modify this customer? */
+    public function canAccessCustomer(User $user, \App\Models\Customer $customer): bool
+    {
+        if ($user->isOrgLevel()) {
+            return true;
+        }
+
+        if ($user->hasRole(Role::SUPERVISOR)) {
+            $teamUserIds = $this->teamMemberIds($user);
+
+            return in_array($customer->owner_id, $teamUserIds) || $customer->created_by === $user->id;
+        }
+
+        $visibleOwnerIds = [$user->id];
+        if ($user->hasRole(Role::SENIOR_STAFF)) {
+            $visibleOwnerIds = array_merge($visibleOwnerIds, $user->subordinates()->pluck('id')->all());
+        }
+
+        return in_array($customer->owner_id, $visibleOwnerIds) || $customer->created_by === $user->id;
+    }
+
     /**
      * Apply visibility scope to a customers query (same hierarchy rules as leads).
      */
