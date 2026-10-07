@@ -56,4 +56,11 @@ return [
         'webhook_secret' => env('CONVYMES_WEBHOOK_SECRET', ''),
     ],
 
+    'microsoft' => [
+        'tenant_id' => env('AZURE_TENANT_ID'),
+        'client_id' => env('AZURE_CLIENT_ID'),
+        'client_secret' => env('AZURE_CLIENT_SECRET'),
+        'teams_webhook_url' => env('MICROSOFT_TEAMS_WEBHOOK_URL'),
+    ],
+
 ];

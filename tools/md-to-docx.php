@@ -342,6 +342,15 @@ final class DocxBuilder
                 continue;
             }
 
+            // html comments (and build markers) are never rendered
+            if (str_starts_with($trim, '<!--')) {
+                while ($i < $total && !str_contains($lines[$i], '-->')) {
+                    $i++;
+                }
+                $i++;
+                continue;
+            }
+
             // fenced code block
             if (str_starts_with($trim, '```')) {
                 $i++;
@@ -414,7 +423,7 @@ final class DocxBuilder
             $i++;
             while ($i < $total) {
                 $next = trim($lines[$i]);
-                if ($next === '' || preg_match('/^(#{1,4}\s|\||[-*]\s|\d+\.\s|>|```|-{3,}$)/', $next)) {
+                if ($next === '' || preg_match('/^(#{1,4}\s|\||[-*]\s|\d+\.\s|>|```|<!--|-{3,}$)/', $next)) {
                     break;
                 }
                 $buffer[] = $next;
@@ -482,14 +491,16 @@ final class DocxBuilder
             . '</Relationships>';
     }
 
-    private static function partFooter(): string
+    private static function partFooter(string $title): string
     {
         $rPr = '<w:rPr><w:sz w:val="18"/><w:color w:val="7A86A8"/></w:rPr>';
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n"
             . '<w:ftr xmlns:w="' . NS_W . '">'
             . '<w:p><w:pPr><w:jc w:val="center"/>' . $rPr . '</w:pPr>'
-            . '<w:r>' . $rPr . '<w:t xml:space="preserve">MSS-CRM test documentation · page </w:t></w:r>'
+            . '<w:r>' . $rPr . '<w:t xml:space="preserve">' . xml($title) . ' · page </w:t></w:r>'
             . '<w:fldSimple w:instr=" PAGE "><w:r>' . $rPr . '<w:t>1</w:t></w:r></w:fldSimple>'
+            . '<w:r>' . $rPr . '<w:t xml:space="preserve"> of </w:t></w:r>'
+            . '<w:fldSimple w:instr=" NUMPAGES "><w:r>' . $rPr . '<w:t>1</w:t></w:r></w:fldSimple>'
             . '</w:p></w:ftr>';
     }
 
@@ -584,7 +595,7 @@ final class DocxBuilder
             '_rels/.rels' => self::partRootRels(),
             'word/document.xml' => $builder->build($markdowns),
             'word/styles.xml' => self::partStyles(),
-            'word/footer1.xml' => self::partFooter(),
+            'word/footer1.xml' => self::partFooter($args->title),
             'word/_rels/document.xml.rels' => self::partDocumentRels(),
             'docProps/core.xml' => self::partCoreProps($args->title, $args->author),
             'docProps/app.xml' => self::partAppProps(),

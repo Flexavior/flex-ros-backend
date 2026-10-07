@@ -10,12 +10,21 @@ use App\Http\Controllers\Api\V1\InboxController;
 use App\Http\Controllers\Api\V1\LaunchPlanController;
 use App\Http\Controllers\Api\V1\LeadController;
 use App\Http\Controllers\Api\V1\MarketingController;
+use App\Http\Controllers\Api\V1\MicrosoftGraphWebhookController;
+use App\Http\Controllers\Api\V1\MicrosoftIntegrationController;
+use App\Http\Controllers\Api\V1\MicrosoftMailController;
 use App\Http\Controllers\Api\V1\ProductServiceController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 // ConvyMes → CRM real-time relay (HMAC-verified, no Sanctum)
 Route::post('webhooks/convymes', ConvymesWebhookController::class);
+
+// Microsoft Graph change notifications (validationToken + mail ingest)
+Route::match(['get', 'post'], 'webhooks/microsoft/graph', MicrosoftGraphWebhookController::class);
+
+// OAuth return from Microsoft (browser redirect — no bearer token; state binds user)
+Route::get('integrations/microsoft/callback', [MicrosoftIntegrationController::class, 'callback']);
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
@@ -76,6 +85,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('inbox/conversations/{conversation}/status', [InboxController::class, 'updateStatus']);
         Route::post('inbox/conversations/{conversation}/link', [InboxController::class, 'link']);
     });
+
+    // Microsoft 365 (delegated mail — Business Basic compatible)
+    Route::get('integrations/microsoft/status', [MicrosoftIntegrationController::class, 'status']);
+    Route::post('integrations/microsoft/connect', [MicrosoftIntegrationController::class, 'connect']);
+    Route::delete('integrations/microsoft/disconnect', [MicrosoftIntegrationController::class, 'disconnect']);
+    Route::post('leads/{lead}/email', [MicrosoftMailController::class, 'sendLead']);
+    Route::post('customers/{customer}/email', [MicrosoftMailController::class, 'sendCustomer']);
 
     // Settings & stages
     Route::get('stages', [SettingsController::class, 'stages']);
