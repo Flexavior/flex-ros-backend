@@ -65,6 +65,11 @@ class User extends Authenticatable
         return $this->hasMany(Customer::class, 'owner_id');
     }
 
+    public function microsoftConnection()
+    {
+        return $this->hasOne(MicrosoftConnection::class);
+    }
+
     public function hasRole(string $code): bool
     {
         return $this->role?->code === $code;

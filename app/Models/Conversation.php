@@ -11,6 +11,7 @@ class Conversation extends Model
     public const CHANNEL_FACEBOOK = 'facebook';
     public const CHANNEL_VIBER = 'viber';
     public const CHANNEL_LINE = 'line';
+    public const CHANNEL_OUTLOOK = 'outlook';
 
     public const STATUS_UNASSIGNED = 'unassigned';
     public const STATUS_OPEN = 'open';
