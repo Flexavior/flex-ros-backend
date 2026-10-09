@@ -2,14 +2,60 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Auth\SsoService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class AuthController extends Controller
 {
+    public function ssoConfig(SsoService $sso)
+    {
+        return response()->json($sso->config());
+    }
+
+    public function ssoRedirect(string $provider, SsoService $sso)
+    {
+        try {
+            return response()->json(['url' => $sso->redirectUrl($provider)]);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+    }
+
+    public function ssoCallback(Request $request, string $provider, SsoService $sso)
+    {
+        $request->validate([
+            'code' => 'required|string',
+            'state' => 'required|string',
+        ]);
+
+        $frontend = rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        try {
+            $exchangeCode = $sso->handleCallback($provider, (string) $request->query('code'), (string) $request->query('state'));
+        } catch (RuntimeException $e) {
+            return redirect($frontend.'/auth/sso/callback?error='.urlencode($e->getMessage()));
+        }
+
+        return redirect($frontend.'/auth/sso/callback?code='.urlencode($exchangeCode).'&provider='.urlencode($provider));
+    }
+
+    public function ssoExchange(Request $request, SsoService $sso)
+    {
+        $data = $request->validate([
+            'code' => 'required|string',
+        ]);
+
+        try {
+            return response()->json($sso->exchange($data['code']));
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     public function login(Request $request)
     {
         $data = $request->validate([

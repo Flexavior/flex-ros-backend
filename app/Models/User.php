@@ -15,6 +15,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'email_verified_at',
         'role_id',
         'supervisor_id',
         'team_id',
@@ -68,6 +69,11 @@ class User extends Authenticatable
     public function microsoftConnection()
     {
         return $this->hasOne(MicrosoftConnection::class);
+    }
+
+    public function identities()
+    {
+        return $this->hasMany(UserIdentity::class);
     }
 
     public function hasRole(string $code): bool

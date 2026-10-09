@@ -28,6 +28,10 @@ Route::get('integrations/microsoft/callback', [MicrosoftIntegrationController::c
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+    Route::get('sso/config', [AuthController::class, 'ssoConfig']);
+    Route::get('sso/{provider}/redirect', [AuthController::class, 'ssoRedirect']);
+    Route::get('sso/{provider}/callback', [AuthController::class, 'ssoCallback']);
+    Route::post('sso/exchange', [AuthController::class, 'ssoExchange']);
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
@@ -39,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
 
     // Leads & pipeline
+    Route::get('leads/schema', [LeadController::class, 'schema']);
     Route::apiResource('leads', LeadController::class);
     Route::post('leads/{lead}/engagements', [LeadController::class, 'storeEngagement']);
     Route::post('leads/{lead}/convert', [LeadController::class, 'convert']);

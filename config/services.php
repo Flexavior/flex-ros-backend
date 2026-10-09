@@ -63,4 +63,22 @@ return [
         'teams_webhook_url' => env('MICROSOFT_TEAMS_WEBHOOK_URL'),
     ],
 
+    'sso' => [
+        'allowed_email_domains' => env('SSO_ALLOWED_EMAIL_DOMAINS', ''),
+        'microsoft' => [
+            'enabled' => env('SSO_MICROSOFT_ENABLED', false),
+            'tenant_id' => env('SSO_MICROSOFT_TENANT_ID', env('AZURE_TENANT_ID')),
+            'client_id' => env('SSO_MICROSOFT_CLIENT_ID', env('AZURE_CLIENT_ID')),
+            'client_secret' => env('SSO_MICROSOFT_CLIENT_SECRET', env('AZURE_CLIENT_SECRET')),
+            'redirect_uri' => env('SSO_MICROSOFT_REDIRECT_URI', env('APP_URL').'/api/v1/auth/sso/microsoft/callback'),
+            'authority' => env('AZURE_AUTHORITY', 'https://login.microsoftonline.com'),
+        ],
+        'google' => [
+            'enabled' => env('SSO_GOOGLE_ENABLED', false),
+            'client_id' => env('SSO_GOOGLE_CLIENT_ID'),
+            'client_secret' => env('SSO_GOOGLE_CLIENT_SECRET'),
+            'redirect_uri' => env('SSO_GOOGLE_REDIRECT_URI', env('APP_URL').'/api/v1/auth/sso/google/callback'),
+        ],
+    ],
+
 ];
