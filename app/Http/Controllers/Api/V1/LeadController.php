@@ -288,6 +288,8 @@ class LeadController extends Controller
         $data = $request->validate([
             'product_service_ids' => 'nullable|array',
             'product_service_ids.*' => 'integer|exists:products_services,id',
+            'agreed_prices' => 'nullable|array',
+            'agreed_prices.*' => 'nullable|numeric|min:0',
             'client_id' => 'nullable|string|max:30',
         ]);
 
@@ -302,6 +304,7 @@ class LeadController extends Controller
                 $data['product_service_ids'] ?? [],
                 $request->user()->id,
                 $data['client_id'] ?? null,
+                $data['agreed_prices'] ?? [],
             );
         } catch (\InvalidArgumentException $e) {
             abort(422, $e->getMessage());

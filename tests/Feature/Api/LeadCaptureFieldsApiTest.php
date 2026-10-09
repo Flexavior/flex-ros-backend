@@ -52,6 +52,26 @@ class LeadCaptureFieldsApiTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_update_lead_qualify_picklists(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $sales = User::where('email', 'sales@mss.test')->first();
+        $lead = Lead::factory()->create(['owner_id' => $sales->id, 'name' => 'Qualify Fields']);
+
+        $this->actingAs($sales)
+            ->putJson("/api/v1/leads/{$lead->id}", [
+                'interest_level' => 'Hot',
+                'buying_timeline' => '1 Month',
+                'primary_contact_method' => 'Viber',
+                'contact_role' => 'Director',
+            ])
+            ->assertOk()
+            ->assertJsonPath('interest_level', 'Hot')
+            ->assertJsonPath('buying_timeline', '1 Month')
+            ->assertJsonPath('primary_contact_method', 'Viber')
+            ->assertJsonPath('contact_role', 'Director');
+    }
+
     public function test_lead_show_includes_legacy_picklist_warnings(): void
     {
         $this->seed(\Database\Seeders\RoleAndUserSeeder::class);

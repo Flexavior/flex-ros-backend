@@ -5,10 +5,10 @@
                     "P:\\ghUpload\\flex-ros-frontend"
                 ],
     "tik":  [
-                "TIK09102026-011-be-picklist-poka-yoke",
-                "TIK09102026-012-fe-picklist-poka-yoke",
+                "TIK09102026-013-be-pipeline-commercial",
+                "TIK09102026-014-fe-pipeline-commercial",
                 "TIK09102026-003-prod-deploy-ghupload"
             ],
-    "synced_at_utc":  "2026-10-09T14:54:09.1718116Z",
-    "cr":  "CR09102026-Lead-Picklist-Poka-Yoke"
+    "synced_at_utc":  "2026-10-09T15:28:39.0895406Z",
+    "cr":  "CR09102026-Lead-Pipeline-Commercial-Alignment"
 }

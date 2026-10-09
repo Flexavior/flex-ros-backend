@@ -83,7 +83,19 @@ class LeadPicklistService
             'interest_level' => ['Hot', 'Warm', 'Cold'],
             'buying_timeline' => ['Immediate', '1 Month', '3 Months', '6 Months', 'Unknown'],
             'contact_method' => ['Call', 'Email', 'Viber', 'LINE', 'Facebook', 'Telegram', 'Meeting', 'Other'],
-            'activity_outcome' => ['No response', 'Connected', 'Follow-up needed', 'Demo booked', 'Proposal sent', 'Won', 'Lost'],
+            'activity_outcome' => [
+                'No response',
+                'Connected',
+                'Follow-up needed',
+                'Demo booked',
+                'Initial quote sent',
+                'Counter-offer',
+                'Volume/terms discussed',
+                'Proposal sent',
+                'Verbal agreement',
+                'Won',
+                'Lost',
+            ],
             'completed' => ['Yes', 'No'],
         ];
     }
