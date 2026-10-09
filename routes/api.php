@@ -14,7 +14,9 @@ use App\Http\Controllers\Api\V1\MicrosoftGraphWebhookController;
 use App\Http\Controllers\Api\V1\MicrosoftIntegrationController;
 use App\Http\Controllers\Api\V1\MicrosoftMailController;
 use App\Http\Controllers\Api\V1\ProductServiceController;
+use App\Http\Controllers\Api\V1\AdminConsoleController;
 use App\Http\Controllers\Api\V1\SettingsController;
+use App\Http\Controllers\Api\V1\UserProvisioningController;
 use Illuminate\Support\Facades\Route;
 
 // ConvyMes → CRM real-time relay (HMAC-verified, no Sanctum)
@@ -41,6 +43,13 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
     Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
+
+    // Admin console (system administrator)
+    Route::get('admin/overview', [AdminConsoleController::class, 'overview']);
+
+    // User provisioning (SSO / Staff → operational roles)
+    Route::get('users/provisioning', [UserProvisioningController::class, 'index']);
+    Route::put('users/{user}/assign-role', [UserProvisioningController::class, 'assignRole']);
 
     // Leads & pipeline
     Route::get('leads/schema', [LeadController::class, 'schema']);

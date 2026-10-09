@@ -40,7 +40,9 @@ class LeadController extends Controller
             $query->stale($days);
         }
 
-        return response()->json($query->paginate($request->integer('per_page', 25)));
+        $perPage = min(max($request->integer('per_page', 25), 1), 50);
+
+        return response()->json($query->paginate($perPage));
     }
 
     public function schema()
