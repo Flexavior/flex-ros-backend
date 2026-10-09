@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Domain\Documents\DocumentLibraryAccess;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DocumentTemplate extends Model
 {
     protected $fillable = [
-        'code', 'title', 'category', 'storage_path', 'allowed_user_ids', 'is_active',
+        'code', 'title', 'category', 'library', 'storage_path', 'uploaded_by',
+        'allowed_user_ids', 'is_active',
     ];
 
     protected $casts = [
@@ -15,21 +18,13 @@ class DocumentTemplate extends Model
         'is_active' => 'boolean',
     ];
 
+    public function uploadedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
     public function userMayDownload(User $user): bool
     {
-        if (!$this->is_active) {
-            return false;
-        }
-
-        if ($user->hasRole('admin') || $user->hasRole('senior_management') || $user->hasRole('ceo')) {
-            return true;
-        }
-
-        $ids = $this->allowed_user_ids;
-        if ($ids === null || $ids === []) {
-            return false;
-        }
-
-        return in_array($user->id, array_map('intval', $ids), true);
+        return DocumentLibraryAccess::userMayDownload($user, $this);
     }
 }

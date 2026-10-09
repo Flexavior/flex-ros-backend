@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Lead;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -49,5 +50,23 @@ class LeadCaptureFieldsApiTest extends TestCase
             'name' => 'Bad Industry',
             'industry' => 'Not A Real Industry',
         ])->assertStatus(422);
+    }
+
+    public function test_lead_show_includes_legacy_picklist_warnings(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $sales = User::where('email', 'sales@mss.test')->first();
+
+        $lead = Lead::factory()->create([
+            'owner_id' => $sales->id,
+            'name' => 'Legacy Picklist Lead',
+            'industry' => 'Pre-Migration Industry Label',
+        ]);
+
+        $this->actingAs($sales)
+            ->getJson("/api/v1/leads/{$lead->id}")
+            ->assertOk()
+            ->assertJsonPath('legacy_picklist_warnings.0.field', 'industry')
+            ->assertJsonPath('legacy_picklist_warnings.0.value', 'Pre-Migration Industry Label');
     }
 }

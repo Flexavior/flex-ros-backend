@@ -64,4 +64,52 @@ class SettingsLeadPicklistsApiTest extends TestCase
         $this->assertSame(6, $qualify['max_idle_touches'] ?? null);
         $this->assertSame('Demo booked', $qualify['progress_outcomes'][0] ?? null);
     }
+
+    public function test_admin_can_fetch_picklist_defaults(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $admin = User::where('email', 'admin@mss.test')->first();
+
+        $this->actingAs($admin)
+            ->getJson('/api/v1/settings/lead-picklists/defaults')
+            ->assertOk()
+            ->assertJsonStructure(['defaults', 'admin_ui_keys'])
+            ->assertJsonPath('defaults.current_stage.0', 'New');
+    }
+
+    public function test_admin_can_restore_single_picklist_key(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $admin = User::where('email', 'admin@mss.test')->first();
+
+        $this->actingAs($admin)
+            ->putJson('/api/v1/settings/lead-picklists', [
+                'industry' => ['Only One'],
+            ])
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->postJson('/api/v1/settings/lead-picklists/restore/industry')
+            ->assertOk()
+            ->assertJsonPath('key', 'industry');
+
+        $industry = $this->actingAs($admin)
+            ->getJson('/api/v1/settings/lead-picklists')
+            ->json('industry');
+
+        $this->assertContains('Education', $industry);
+    }
+
+    public function test_admin_cannot_save_current_stage_with_too_few_options(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $admin = User::where('email', 'admin@mss.test')->first();
+
+        $this->actingAs($admin)
+            ->putJson('/api/v1/settings/lead-picklists', [
+                'current_stage' => ['A', 'B'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['current_stage']);
+    }
 }

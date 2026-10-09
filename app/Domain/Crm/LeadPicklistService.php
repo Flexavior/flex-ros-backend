@@ -14,6 +14,19 @@ class LeadPicklistService
 {
     public const SETTINGS_KEY = 'crm.lead_picklists';
 
+    /** Keys editable in System Settings UI (one textarea each). */
+    public const ADMIN_UI_KEYS = [
+        'customer_segment',
+        'industry',
+        'geo_location',
+        'lead_source',
+        'product_interest',
+        'current_stage',
+    ];
+
+    /** Catalogues that must retain at least PICKLIST_MIN_OPTIONS_CRITICAL options on save. */
+    public const CRITICAL_MIN_KEYS = ['current_stage', 'activity_outcome'];
+
     public function catalogKeys(): array
     {
         return array_keys($this->defaults());
@@ -101,6 +114,66 @@ class LeadPicklistService
         return $this->all()[$key] ?? [];
     }
 
+    /** Code defaults for one catalogue (poka-yoke restore source). */
+    public function defaultOptions(string $key): array
+    {
+        $defaults = $this->defaults();
+
+        return $defaults[$key] ?? [];
+    }
+
+    /**
+     * Replace one catalogue in settings with code defaults; other keys unchanged.
+     *
+     * @return array<int, string>
+     */
+    public function restoreKeyToDefaults(string $key, ?int $updatedBy = null): array
+    {
+        if (!in_array($key, $this->catalogKeys(), true)) {
+            throw ValidationException::withMessages([
+                $key => ['Unknown picklist catalogue key.'],
+            ]);
+        }
+
+        $defaults = $this->defaults();
+        $restored = $this->sanitizeOptions($defaults[$key] ?? [], $defaults[$key] ?? []);
+
+        $stored = Setting::get(self::SETTINGS_KEY, []);
+        if (!is_array($stored)) {
+            $stored = [];
+        }
+        $stored[$key] = $restored;
+        $clean = [];
+        foreach ($this->catalogKeys() as $catalogKey) {
+            $clean[$catalogKey] = array_key_exists($catalogKey, $stored)
+                ? $this->sanitizeOptions((array) $stored[$catalogKey], $defaults[$catalogKey] ?? [])
+                : $this->sanitizeOptions($defaults[$catalogKey] ?? [], $defaults[$catalogKey] ?? []);
+        }
+
+        Setting::put(self::SETTINGS_KEY, $clean, 'crm', $updatedBy);
+
+        return $restored;
+    }
+
+    /**
+     * @return list<array{field: string, value: string}>
+     */
+    public function legacyWarningsForLead(\App\Models\Lead $lead): array
+    {
+        $warnings = [];
+        foreach (self::ADMIN_UI_KEYS as $field) {
+            $value = $lead->{$field};
+            if ($value === null || $value === '') {
+                continue;
+            }
+            if (!in_array((string) $value, $this->options($field), true)) {
+                $warnings[] = ['field' => $field, 'value' => (string) $value];
+            }
+        }
+
+        return $warnings;
+    }
+
     public function rule(string $key, bool $sometimes = false): array
     {
         $prefix = $sometimes ? ['sometimes'] : ['nullable'];
@@ -160,6 +233,7 @@ class LeadPicklistService
                     $key => ['Picklist cannot be empty after validation.'],
                 ]);
             }
+            $this->assertMinimumOptionCount($key, $clean[$key]);
         }
 
         Setting::put(self::SETTINGS_KEY, $clean, 'crm', $updatedBy);
@@ -192,5 +266,17 @@ class LeadPicklistService
         $out = array_values(array_unique($out));
 
         return $out !== [] ? $out : $fallback;
+    }
+
+    protected function assertMinimumOptionCount(string $key, array $options): void
+    {
+        if (!in_array($key, self::CRITICAL_MIN_KEYS, true)) {
+            return;
+        }
+        if (count($options) < CrmConfigLimits::PICKLIST_MIN_OPTIONS_CRITICAL) {
+            throw ValidationException::withMessages([
+                $key => ['This catalogue must keep at least '.CrmConfigLimits::PICKLIST_MIN_OPTIONS_CRITICAL.' options.'],
+            ]);
+        }
     }
 }

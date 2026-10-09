@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domain\Crm\ChecklistService;
 use App\Domain\Crm\ClientIdGenerator;
 use App\Domain\Crm\CrmConfigLimits;
+use App\Domain\Crm\CustomerStatus;
 use App\Domain\Crm\LeadPicklistService;
 use App\Domain\Crm\ScopeService;
 use App\Models\Customer;
@@ -51,6 +52,15 @@ class CustomerController extends Controller
     {
         $this->authorizeView($request, $customer);
 
+        if ($request->has('status')) {
+            $request->merge(['status' => CustomerStatus::normalize($request->input('status'))]);
+        }
+        foreach (['customer_segment', 'industry', 'geo_location'] as $pick) {
+            if ($request->has($pick) && $request->input($pick) === '') {
+                $request->merge([$pick => null]);
+            }
+        }
+
         $data = $request->validate([
             'client_id' => 'sometimes|string|max:30',
             'name' => 'sometimes|string|max:255',
@@ -58,7 +68,7 @@ class CustomerController extends Controller
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:'.CrmConfigLimits::CUSTOMER_ADDRESS_MAX,
-            'status' => ['sometimes', 'string', Rule::in(['active', 'onboarding', 'churned'])],
+            'status' => ['sometimes', 'string', Rule::in(CustomerStatus::CANONICAL)],
             'customer_segment' => ['nullable', 'string', 'max:120', $this->picklists->rule('customer_segment')],
             'industry' => ['nullable', 'string', 'max:120', $this->picklists->rule('industry')],
             'geo_location' => ['nullable', 'string', 'max:120', $this->picklists->rule('geo_location')],

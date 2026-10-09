@@ -31,11 +31,11 @@ class Role extends Model
      */
     public const INBOX_AGENTS = [
         self::CUSTOMER_SERVICE, self::SALES, self::STAFF, self::SENIOR_STAFF, self::SUPERVISOR,
-        self::SENIOR_MANAGEMENT, self::CEO, self::ADMIN,
+        self::SENIOR_MANAGEMENT, self::CEO,
     ];
 
     /** Roles that may assign conversations to other users (flow control). */
-    public const INBOX_MANAGERS = [self::SUPERVISOR, self::SENIOR_MANAGEMENT, self::CEO, self::ADMIN];
+    public const INBOX_MANAGERS = [self::SUPERVISOR, self::SENIOR_MANAGEMENT, self::CEO];
 
     public function users()
     {

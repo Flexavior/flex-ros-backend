@@ -1,0 +1,14 @@
+﻿{
+    "source_root":  "C:\\laragon\\www\\mss-crm",
+    "mirrors":  [
+                    "P:\\ghUpload\\flex-ros-backend",
+                    "P:\\ghUpload\\flex-ros-frontend"
+                ],
+    "tik":  [
+                "TIK09102026-011-be-picklist-poka-yoke",
+                "TIK09102026-012-fe-picklist-poka-yoke",
+                "TIK09102026-003-prod-deploy-ghupload"
+            ],
+    "synced_at_utc":  "2026-10-09T14:54:09.1718116Z",
+    "cr":  "CR09102026-Lead-Picklist-Poka-Yoke"
+}

@@ -134,6 +134,37 @@ class SettingsController extends Controller
         return response()->json($this->leadPicklists->all());
     }
 
+    /** GET /api/v1/settings/lead-picklists/defaults — code defaults (poka-yoke reference). */
+    public function getLeadPicklistDefaults(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        return response()->json([
+            'defaults' => $this->leadPicklists->defaults(),
+            'admin_ui_keys' => LeadPicklistService::ADMIN_UI_KEYS,
+        ]);
+    }
+
+    /** POST /api/v1/settings/lead-picklists/restore/{key} — reset one catalogue to code defaults. */
+    public function restoreLeadPicklist(Request $request, string $key)
+    {
+        $this->authorizeAdmin($request);
+
+        if (!in_array($key, $this->leadPicklists->catalogKeys(), true)) {
+            throw ValidationException::withMessages([
+                $key => ['Unknown picklist catalogue key.'],
+            ]);
+        }
+
+        $restored = $this->leadPicklists->restoreKeyToDefaults($key, $request->user()->id);
+
+        return response()->json([
+            'key' => $key,
+            'options' => $restored,
+            'picklists' => $this->leadPicklists->all(),
+        ]);
+    }
+
     /** PUT /api/v1/settings/lead-picklists — admin: edit option lists (industry, geo, segment…). */
     public function updateLeadPicklists(Request $request)
     {
