@@ -4,6 +4,7 @@ namespace App\Domain\Microsoft;
 
 use App\Models\MicrosoftConnection;
 use App\Models\User;
+use App\Support\SafeReturnPath;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -16,10 +17,15 @@ class MicrosoftOAuthService
         return (bool) (config('microsoft.client_id') && config('microsoft.client_secret') && config('microsoft.tenant_id'));
     }
 
-    public function authorizationUrl(User $user): string
+    public function authorizationUrl(User $user, string $returnPath = '/settings'): string
     {
+        MicrosoftOAuthConfigGuard::assertMailRedirectUri();
+
         $state = Str::random(40);
-        Cache::put('microsoft.oauth.'.$state, $user->id, now()->addMinutes(10));
+        Cache::put('microsoft.oauth.'.$state, [
+            'user_id' => $user->id,
+            'return' => $returnPath,
+        ], now()->addMinutes(10));
 
         $query = http_build_query([
             'client_id' => config('microsoft.client_id'),
@@ -33,9 +39,21 @@ class MicrosoftOAuthService
         return $this->authorizeEndpoint().'?'.$query;
     }
 
-    public function handleCallback(string $code, string $state): MicrosoftConnection
+    /**
+     * @return array{connection: MicrosoftConnection, return_path: string}
+     */
+    public function handleCallback(string $code, string $state): array
     {
-        $userId = Cache::pull('microsoft.oauth.'.$state);
+        $payload = Cache::pull('microsoft.oauth.'.$state);
+        if (!$payload) {
+            throw new RuntimeException('Invalid or expired OAuth state.');
+        }
+
+        $returnPath = '/settings';
+        $userId = is_array($payload) ? ($payload['user_id'] ?? null) : $payload;
+        if (is_array($payload)) {
+            $returnPath = SafeReturnPath::normalize($payload['return'] ?? '/settings', '/settings');
+        }
         if (!$userId) {
             throw new RuntimeException('Invalid or expired OAuth state.');
         }
@@ -48,7 +66,7 @@ class MicrosoftOAuthService
             ->throw()
             ->json();
 
-        return MicrosoftConnection::updateOrCreate(
+        $connection = MicrosoftConnection::updateOrCreate(
             ['user_id' => $user->id],
             [
                 'mailbox_upn' => $profile['userPrincipalName'] ?? $profile['mail'] ?? null,
@@ -58,6 +76,8 @@ class MicrosoftOAuthService
                 'scopes' => explode(' ', $tokens['scope'] ?? implode(' ', config('microsoft.scopes'))),
             ]
         );
+
+        return ['connection' => $connection, 'return_path' => $returnPath];
     }
 
     public function disconnect(User $user): void
