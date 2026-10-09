@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\V1\InboxController;
 use App\Http\Controllers\Api\V1\LaunchPlanController;
 use App\Http\Controllers\Api\V1\LeadController;
 use App\Http\Controllers\Api\V1\MarketingController;
+use App\Http\Controllers\Api\V1\MicrosoftGraphWebhookController;
+use App\Http\Controllers\Api\V1\MicrosoftIntegrationController;
+use App\Http\Controllers\Api\V1\MicrosoftMailController;
 use App\Http\Controllers\Api\V1\ProductServiceController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use Illuminate\Support\Facades\Route;
@@ -17,8 +20,18 @@ use Illuminate\Support\Facades\Route;
 // ConvyMes → CRM real-time relay (HMAC-verified, no Sanctum)
 Route::post('webhooks/convymes', ConvymesWebhookController::class);
 
+// Microsoft Graph change notifications (validationToken + mail ingest)
+Route::match(['get', 'post'], 'webhooks/microsoft/graph', MicrosoftGraphWebhookController::class);
+
+// OAuth return from Microsoft (browser redirect — no bearer token; state binds user)
+Route::get('integrations/microsoft/callback', [MicrosoftIntegrationController::class, 'callback']);
+
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+    Route::get('sso/config', [AuthController::class, 'ssoConfig']);
+    Route::get('sso/{provider}/redirect', [AuthController::class, 'ssoRedirect']);
+    Route::get('sso/{provider}/callback', [AuthController::class, 'ssoCallback']);
+    Route::post('sso/exchange', [AuthController::class, 'ssoExchange']);
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
@@ -30,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
 
     // Leads & pipeline
+    Route::get('leads/schema', [LeadController::class, 'schema']);
     Route::apiResource('leads', LeadController::class);
     Route::post('leads/{lead}/engagements', [LeadController::class, 'storeEngagement']);
     Route::post('leads/{lead}/convert', [LeadController::class, 'convert']);
@@ -76,6 +90,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('inbox/conversations/{conversation}/status', [InboxController::class, 'updateStatus']);
         Route::post('inbox/conversations/{conversation}/link', [InboxController::class, 'link']);
     });
+
+    // Microsoft 365 (delegated mail — Business Basic compatible)
+    Route::get('integrations/microsoft/status', [MicrosoftIntegrationController::class, 'status']);
+    Route::post('integrations/microsoft/connect', [MicrosoftIntegrationController::class, 'connect']);
+    Route::delete('integrations/microsoft/disconnect', [MicrosoftIntegrationController::class, 'disconnect']);
+    Route::post('leads/{lead}/email', [MicrosoftMailController::class, 'sendLead']);
+    Route::post('customers/{customer}/email', [MicrosoftMailController::class, 'sendCustomer']);
 
     // Settings & stages
     Route::get('stages', [SettingsController::class, 'stages']);
