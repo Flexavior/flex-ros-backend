@@ -103,18 +103,11 @@ class RoleAndUserSeeder extends Seeder
         Setting::put('auth.sso.microsoft_enabled', false, 'auth');
         Setting::put('auth.sso.google_enabled', false, 'auth');
         Setting::put('auth.sso.allowed_email_domains', [], 'auth');
-        Setting::put('crm.lead_picklists', [
-            'lead_source' => ['Referrals', 'Organic Search', 'Paid Ads', 'Social Media', 'Website', 'Events', 'Partner', 'Walk-in', 'Other'],
-            'product_interest' => ['CRM', 'Marketing', 'Project Management', 'HR', 'Finance', 'Custom Integration', 'Other'],
-            'customer_segment' => ['Startup', 'SME', 'Enterprise', 'Government', 'Non-profit', 'Education', 'Other'],
-            'contact_role' => ['Owner', 'Director', 'Manager', 'Staff', 'Procurement', 'IT', 'Other'],
-            'current_stage' => ['New', 'Contacted', 'Qualified', 'Demo / Meeting', 'Proposal', 'Negotiation', 'Won', 'Lost'],
-            'interest_level' => ['Hot', 'Warm', 'Cold'],
-            'buying_timeline' => ['Immediate', '1 Month', '3 Months', '6 Months', 'Unknown'],
-            'contact_method' => ['Call', 'Email', 'Viber', 'LINE', 'Facebook', 'Telegram', 'Meeting', 'Other'],
-            'activity_outcome' => ['No response', 'Connected', 'Follow-up needed', 'Demo booked', 'Proposal sent', 'Won', 'Lost'],
-            'completed' => ['Yes', 'No'],
-        ], 'crm');
+        Setting::put(
+            \App\Domain\Crm\LeadPicklistService::SETTINGS_KEY,
+            (new \App\Domain\Crm\LeadPicklistService)->defaults(),
+            'crm'
+        );
     }
 
     protected function seedChecklistsAndIntegrations(): void

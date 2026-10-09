@@ -116,7 +116,7 @@ class AuthAndLeadApiTest extends TestCase
 
         $res->assertCreated()
             ->assertJsonStructure(['id', 'client_id', 'name']);
-        $this->assertMatchesRegularExpression('/^CUS-\d{4}-\d{4}$/', $res->json('client_id'));
+        $this->assertMatchesRegularExpression('/^\d{6}_C\d+$/', $res->json('client_id'));
         $this->assertDatabaseHas('customer_products', [
             'customer_id' => $res->json('id'),
             'product_service_id' => $svc->id,

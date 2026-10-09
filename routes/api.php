@@ -61,7 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('appointments', AppointmentController::class)->only(['index', 'store', 'update']);
 
     // Customers & checklists
-    Route::apiResource('customers', CustomerController::class)->only(['index', 'show']);
+    Route::apiResource('customers', CustomerController::class)->only(['index', 'show', 'update']);
     Route::put('customers/{customer}/checklist/{itemId}', [CustomerController::class, 'toggleChecklist']);
 
     // Catalogue
@@ -113,5 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('settings/general', [SettingsController::class, 'updateGeneral']);
     Route::get('settings/checklists', [SettingsController::class, 'getChecklists']);
     Route::put('settings/checklists', [SettingsController::class, 'updateChecklists']);
+    Route::get('settings/lead-picklists', [SettingsController::class, 'getLeadPicklists']);
+    Route::put('settings/lead-picklists', [SettingsController::class, 'updateLeadPicklists']);
     Route::get('roles', [SettingsController::class, 'roles']);
 });

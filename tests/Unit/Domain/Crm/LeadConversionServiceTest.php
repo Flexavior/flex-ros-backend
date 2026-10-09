@@ -80,7 +80,7 @@ class LeadConversionServiceTest extends TestCase
 
         $customer = app(LeadConversionService::class)->convert($lead, [], $user->id);
 
-        $this->assertMatchesRegularExpression('/^CUS-\d{4}-\d{4}$/', $customer->client_id);
+        $this->assertMatchesRegularExpression('/^\d{6}_C\d+$/', $customer->client_id);
     }
 
     // Double conversion is rejected

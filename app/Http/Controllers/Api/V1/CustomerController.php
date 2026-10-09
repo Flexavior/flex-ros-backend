@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Crm\ChecklistService;
+use App\Domain\Crm\ClientIdGenerator;
+use App\Domain\Crm\CrmConfigLimits;
 use App\Domain\Crm\ScopeService;
 use App\Models\Customer;
 use Illuminate\Http\Request;
@@ -23,7 +25,13 @@ class CustomerController extends Controller
 
         $query = $this->scopeService->applyCustomerScope($query, $request->user());
 
-        return response()->json($query->paginate($request->integer('per_page', 25)));
+        $perPage = min(
+            max($request->integer('per_page', CrmConfigLimits::LIST_PER_PAGE_DEFAULT), 1),
+            CrmConfigLimits::LIST_PER_PAGE_MAX
+        );
+        $page = max(1, min($request->integer('page', 1), CrmConfigLimits::LIST_PAGE_MAX));
+
+        return response()->json($query->paginate($perPage, ['*'], 'page', $page));
     }
 
     public function show(Request $request, Customer $customer)
@@ -34,6 +42,30 @@ class CustomerController extends Controller
             'customer' => $customer->load(['owner:id,name', 'products', 'agreements', 'launchPlans.dependencies']),
             'checklists' => $this->checklistService->completionFor($customer),
         ]);
+    }
+
+    public function update(Request $request, Customer $customer, ClientIdGenerator $clientIds)
+    {
+        $this->authorizeView($request, $customer);
+
+        $data = $request->validate([
+            'client_id' => 'sometimes|string|max:30',
+            'name' => 'sometimes|string|max:255',
+            'company' => 'nullable|string|max:255',
+            'email' => 'nullable|email',
+            'phone' => 'nullable|string|max:50',
+            'address' => 'nullable|string|max:'.CrmConfigLimits::CUSTOMER_ADDRESS_MAX,
+        ]);
+
+        if (isset($data['client_id']) && $data['client_id'] !== $customer->client_id) {
+            $clientIds->validateNewFormat($data['client_id']);
+            $clientIds->assertUnique($data['client_id'], $customer->id);
+        }
+
+        $customer->fill($data);
+        $customer->save();
+
+        return response()->json($customer->load(['owner:id,name', 'products']));
     }
 
     /** Toggle a dynamic checklist item for this customer. */
