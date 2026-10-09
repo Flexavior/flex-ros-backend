@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Crm\CrmConfigLimits;
 use App\Domain\Crm\LeadPicklistService;
 use App\Http\Controllers\Controller;
+use App\Models\Lead;
 use App\Models\Role;
 use App\Models\Setting;
 use Illuminate\Http\Request;
@@ -66,9 +67,12 @@ class SettingsController extends Controller
     /** GET/PUT crm.stale_task_days and other thresholds. */
     public function getGeneral()
     {
+        $qualify = Lead::qualifyConfig();
+
         return response()->json([
             'crm.stale_task_days' => Setting::get('crm.stale_task_days', 5),
             'crm.client_id_prefix' => Setting::get('crm.client_id_prefix', 'CUS'),
+            'crm.qualify' => $qualify,
         ]);
     }
 
@@ -81,7 +85,38 @@ class SettingsController extends Controller
             'crm.client_id_prefix' => 'sometimes|string|max:10',
         ]);
 
+        $requestData = $request->all();
+        if (array_key_exists('crm.qualify', $requestData)) {
+            if (!is_array($requestData['crm.qualify'])) {
+                throw ValidationException::withMessages([
+                    'crm.qualify' => ['The crm.qualify field must be an array.'],
+                ]);
+            }
+
+            $qualify = validator($requestData['crm.qualify'], [
+                'max_idle_touches' => 'sometimes|integer|min:1|max:50',
+                'progress_outcomes' => 'sometimes|array|min:1|max:20',
+                'progress_outcomes.*' => 'string|max:'.CrmConfigLimits::PICKLIST_OPTION_MAX_LENGTH,
+            ])->validate();
+
+            $data['crm.qualify'] = $qualify;
+        }
+
+        if (isset($data['crm.qualify']['progress_outcomes'])) {
+            $allowed = $this->leadPicklists->options('activity_outcome');
+            foreach ($data['crm.qualify']['progress_outcomes'] as $outcome) {
+                if (!in_array($outcome, $allowed, true)) {
+                    throw ValidationException::withMessages([
+                        'crm.qualify.progress_outcomes' => ['Each progress outcome must match activity_outcome picklist options.'],
+                    ]);
+                }
+            }
+        }
+
         foreach ($data as $key => $value) {
+            if ($key === 'crm.qualify') {
+                $value = array_replace(Lead::qualifyDefaults(), $value);
+            }
             Setting::put($key, $value);
         }
 

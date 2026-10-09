@@ -11,7 +11,7 @@ class Customer extends Model
 
     protected $fillable = [
         'client_id', 'name', 'company', 'email', 'phone', 'status',
-        'lead_id', 'owner_id', 'created_by',
+        'address', 'lead_id', 'owner_id', 'created_by',
     ];
 
     public function lead() { return $this->belongsTo(Lead::class); }

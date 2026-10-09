@@ -24,6 +24,16 @@ final class CrmConfigLimits
 
     public const ENGAGEMENT_SUMMARY_MAX = 2000;
 
+    public const LEAD_CONTACT_NAME_MAX = 150;
+
+    public const LEAD_CONTACT_ROLE_MAX = 120;
+
+    public const LEAD_CONTACT_PHONE_MAX = 50;
+
+    public const LEAD_CONTACT_VIBER_ID_MAX = 120;
+
+    public const CUSTOMER_ADDRESS_MAX = 5000;
+
     private function __construct()
     {
     }

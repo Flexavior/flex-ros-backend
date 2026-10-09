@@ -54,6 +54,7 @@ class CustomerController extends Controller
             'company' => 'nullable|string|max:255',
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:50',
+            'address' => 'nullable|string|max:'.CrmConfigLimits::CUSTOMER_ADDRESS_MAX,
         ]);
 
         if (isset($data['client_id']) && $data['client_id'] !== $customer->client_id) {

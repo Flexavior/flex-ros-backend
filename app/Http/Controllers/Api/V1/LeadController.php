@@ -8,7 +8,7 @@ use App\Domain\Crm\LeadPicklistService;
 use App\Domain\Crm\ScopeService;
 use App\Models\CrmFieldDefinition;
 use App\Models\Lead;
-use App\Models\Setting;
+use App\Models\LeadContact;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -25,6 +25,7 @@ class LeadController extends Controller
     public function index(Request $request)
     {
         $query = Lead::with(['owner:id,name', 'stage:id,code,name', 'customer:id,client_id,name'])
+            ->withQualifyIdleMetrics()
             ->orderByDesc('created_at');
 
         $query = $this->scopeService->applyLeadScope($query, $request->user());
@@ -99,6 +100,13 @@ class LeadController extends Controller
             'notes' => 'nullable|string|max:'.CrmConfigLimits::NOTES_MAX,
             'owner_id' => 'nullable|exists:users,id',
             'status' => 'nullable|in:new,contacted,qualified,appointment,converted,lost',
+            'contacts' => 'nullable|array|max:50',
+            'contacts.*.name' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_NAME_MAX,
+            'contacts.*.role' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_ROLE_MAX,
+            'contacts.*.email' => 'nullable|email|max:255',
+            'contacts.*.phone' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_PHONE_MAX,
+            'contacts.*.viber_id' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_VIBER_ID_MAX,
+            'contacts.*.is_primary' => 'nullable|boolean',
         ]);
         $this->validateCustomFieldValues($data['custom_fields'] ?? null, 'lead');
         $this->syncLegacyStatusColumns($data);
@@ -113,8 +121,16 @@ class LeadController extends Controller
         $data['owner_id'] ??= $user->id;
 
         $lead = Lead::create($data);
+        $this->syncContacts($lead, $data['contacts'] ?? null);
 
-        return response()->json($lead->load('owner:id,name'), 201);
+        return response()->json($lead->load(['owner:id,name', 'contacts'])->loadCount([
+            'engagements as idle_touch_count' => function ($q) {
+                $progress = Lead::qualifyProgressOutcomes();
+                $q->where(function ($w) use ($progress) {
+                    $w->whereNull('activity_outcome')->orWhereNotIn('activity_outcome', $progress);
+                });
+            },
+        ]), 201);
     }
 
     public function show(Request $request, Lead $lead)
@@ -123,7 +139,14 @@ class LeadController extends Controller
 
         return response()->json($lead->load([
             'owner:id,name', 'stage:id,code,name', 'customer:id,client_id,name',
-            'engagements.user:id,name', 'engagements.assignedOwner:id,name', 'appointments.user:id,name',
+            'engagements.user:id,name', 'engagements.assignedOwner:id,name', 'appointments.user:id,name', 'contacts',
+        ])->loadCount([
+            'engagements as idle_touch_count' => function ($q) {
+                $progress = Lead::qualifyProgressOutcomes();
+                $q->where(function ($w) use ($progress) {
+                    $w->whereNull('activity_outcome')->orWhereNotIn('activity_outcome', $progress);
+                });
+            },
         ]));
     }
 
@@ -152,6 +175,14 @@ class LeadController extends Controller
             'notes' => 'nullable|string|max:'.CrmConfigLimits::NOTES_MAX,
             'status' => 'sometimes|in:new,contacted,qualified,appointment,converted,lost',
             'owner_id' => 'sometimes|exists:users,id',
+            'contacts' => 'sometimes|array|max:50',
+            'contacts.*.id' => 'sometimes|integer',
+            'contacts.*.name' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_NAME_MAX,
+            'contacts.*.role' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_ROLE_MAX,
+            'contacts.*.email' => 'nullable|email|max:255',
+            'contacts.*.phone' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_PHONE_MAX,
+            'contacts.*.viber_id' => 'nullable|string|max:'.CrmConfigLimits::LEAD_CONTACT_VIBER_ID_MAX,
+            'contacts.*.is_primary' => 'nullable|boolean',
         ]);
         $this->validateCustomFieldValues($data['custom_fields'] ?? null, 'lead');
         $this->syncLegacyStatusColumns($data);
@@ -162,8 +193,18 @@ class LeadController extends Controller
         }
 
         $lead->update($data);
+        if (array_key_exists('contacts', $data)) {
+            $this->syncContacts($lead, $data['contacts']);
+        }
 
-        return response()->json($lead->fresh(['owner:id,name']));
+        return response()->json($lead->fresh(['owner:id,name', 'contacts'])->loadCount([
+            'engagements as idle_touch_count' => function ($q) {
+                $progress = Lead::qualifyProgressOutcomes();
+                $q->where(function ($w) use ($progress) {
+                    $w->whereNull('activity_outcome')->orWhereNotIn('activity_outcome', $progress);
+                });
+            },
+        ]));
     }
 
     public function destroy(Request $request, Lead $lead)
@@ -246,6 +287,7 @@ class LeadController extends Controller
         ]);
 
         $this->authorizeConvert($request->user());
+        $this->assertConvertStageEligible($lead);
 
         $service = app(\App\Domain\Crm\LeadConversionService::class);
 
@@ -269,6 +311,90 @@ class LeadController extends Controller
         if ($user->hasRole(\App\Models\Role::STAFF) || $user->hasRole(\App\Models\Role::MARKETING)) {
             abort(403, 'Your role cannot convert leads.');
         }
+    }
+
+    protected function assertConvertStageEligible(Lead $lead): void
+    {
+        abort_unless($lead->convert_eligible, 422, 'Lead stage is not eligible for conversion yet.');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>|null  $contacts
+     */
+    private function syncContacts(Lead $lead, ?array $contacts): void
+    {
+        if ($contacts === null) {
+            return;
+        }
+
+        $existing = $lead->contacts()->get()->keyBy('id');
+        $normalized = [];
+        $primaryCount = 0;
+
+        foreach ($contacts as $item) {
+            $name = isset($item['name']) ? trim((string) $item['name']) : null;
+            $role = isset($item['role']) ? trim((string) $item['role']) : null;
+            $email = isset($item['email']) ? trim((string) $item['email']) : null;
+            $phone = isset($item['phone']) ? trim((string) $item['phone']) : null;
+            $viberId = isset($item['viber_id']) ? trim((string) $item['viber_id']) : null;
+            $isPrimary = (bool) ($item['is_primary'] ?? false);
+
+            $payload = [
+                'name' => $name !== '' ? $name : null,
+                'role' => $role !== '' ? $role : null,
+                'email' => $email !== '' ? $email : null,
+                'phone' => $phone !== '' ? $phone : null,
+                'viber_id' => $viberId !== '' ? $viberId : null,
+                'is_primary' => $isPrimary,
+            ];
+
+            // Ignore completely blank rows to keep the API tolerant to FE add/remove UX.
+            $hasSignal = collect($payload)->except('is_primary')->filter(fn ($v) => $v !== null)->isNotEmpty();
+            if (!$hasSignal) {
+                continue;
+            }
+
+            if ($isPrimary) {
+                $primaryCount++;
+            }
+
+            $normalized[] = [
+                'id' => isset($item['id']) ? (int) $item['id'] : null,
+                'payload' => $payload,
+            ];
+        }
+
+        if ($primaryCount > 1) {
+            throw ValidationException::withMessages([
+                'contacts' => ['Only one primary contact is allowed.'],
+            ]);
+        }
+
+        $kept = [];
+        foreach ($normalized as $item) {
+            if ($item['id']) {
+                /** @var LeadContact|null $contact */
+                $contact = $existing->get($item['id']);
+                if (!$contact) {
+                    throw ValidationException::withMessages([
+                        'contacts' => ['Contact id is invalid for this lead.'],
+                    ]);
+                }
+                $contact->fill($item['payload'])->save();
+                $kept[] = $contact->id;
+                continue;
+            }
+
+            $created = $lead->contacts()->create($item['payload']);
+            $kept[] = $created->id;
+        }
+
+        if ($kept === []) {
+            $lead->contacts()->delete();
+            return;
+        }
+
+        $lead->contacts()->whereNotIn('id', $kept)->delete();
     }
 
     private function validateCustomFieldValues(?array $values, string $entity): void

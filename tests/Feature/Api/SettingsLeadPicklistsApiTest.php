@@ -44,4 +44,24 @@ class SettingsLeadPicklistsApiTest extends TestCase
             ])
             ->assertStatus(422);
     }
+
+    public function test_admin_can_update_qualify_settings_with_picklist_outcomes(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $admin = User::where('email', 'admin@mss.test')->first();
+
+        $res = $this->actingAs($admin)
+            ->putJson('/api/v1/settings/general', [
+                'crm.qualify' => [
+                    'max_idle_touches' => 6,
+                    'progress_outcomes' => ['Demo booked', 'Proposal sent'],
+                ],
+            ])->assertOk();
+
+        $payload = $res->json();
+        $qualify = $payload['crm.qualify'] ?? null;
+        $this->assertIsArray($qualify);
+        $this->assertSame(6, $qualify['max_idle_touches'] ?? null);
+        $this->assertSame('Demo booked', $qualify['progress_outcomes'][0] ?? null);
+    }
 }
