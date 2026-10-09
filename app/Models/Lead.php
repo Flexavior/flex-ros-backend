@@ -25,8 +25,8 @@ class Lead extends Model
     protected $fillable = [
         'name', 'company', 'email', 'phone', 'source', 'status', 'notes',
         'owner_id', 'stage_id', 'customer_id', 'status_updated_at', 'created_by',
-        'lead_source', 'product_interest', 'customer_segment', 'contact_role',
-        'current_stage', 'interest_level', 'buying_timeline', 'primary_contact_method',
+        'lead_source', 'product_interest', 'customer_segment', 'geo_location', 'industry',
+        'contact_role', 'current_stage', 'interest_level', 'buying_timeline', 'primary_contact_method',
         'last_activity_outcome', 'custom_fields',
     ];
 

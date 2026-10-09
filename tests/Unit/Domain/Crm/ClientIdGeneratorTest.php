@@ -3,7 +3,6 @@
 namespace Tests\Unit\Domain\Crm;
 
 use App\Domain\Crm\ClientIdGenerator;
-use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -11,53 +10,42 @@ class ClientIdGeneratorTest extends TestCase
 {
     use RefreshDatabase;
 
-    // UT-01: ID format {PREFIX}-YYYY-####
     public function test_generates_id_in_expected_format(): void
     {
         $generator = new ClientIdGenerator;
-
         $clientId = $generator->generate();
 
-        $this->assertMatchesRegularExpression(
-            '/^CUS-\d{4}-\d{4}$/',
-            $clientId,
-            'Client ID must match CUS-YYYY-#### format'
-        );
+        $this->assertMatchesRegularExpression('/^\d{6}_C\d+$/', $clientId);
+        $this->assertStringStartsWith(now()->format('ymd').'_C', $clientId);
     }
 
-    // UT-02a: sequence increments
-    public function test_sequence_increments(): void
+    public function test_sequence_increments_from_legacy_ids(): void
     {
         \App\Models\Customer::create([
-            'client_id' => sprintf('CUS-%d-0001', now()->year),
-            'name' => 'First Client',
+            'client_id' => '240213_C26',
+            'name' => 'Legacy',
         ]);
 
         $next = (new ClientIdGenerator)->generate();
-
-        $this->assertSame(sprintf('CUS-%d-0002', now()->year), $next);
+        $this->assertSame(now()->format('ymd').'_C27', $next);
     }
 
-    // UT-02b: year change resets sequence
-    public function test_sequence_resets_per_year(): void
+    public function test_manual_id_must_match_pattern(): void
+    {
+        $generator = new ClientIdGenerator;
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $generator->validateNewFormat('CUS-2026-0001');
+    }
+
+    public function test_assert_unique_rejects_duplicate(): void
     {
         \App\Models\Customer::create([
-            'client_id' => 'CUS-2020-0042',
-            'name' => 'Old Client',
+            'client_id' => '261009_C101',
+            'name' => 'Taken',
         ]);
 
-        $next = (new ClientIdGenerator)->generate();
-
-        $this->assertSame(sprintf('CUS-%d-0001', now()->year), $next);
-    }
-
-    // Prefix is settings-driven
-    public function test_prefix_is_settings_driven(): void
-    {
-        Setting::put('crm.client_id_prefix', 'CLT');
-
-        $next = (new ClientIdGenerator)->generate();
-
-        $this->assertStringStartsWith('CLT-', $next);
+        $generator = new ClientIdGenerator;
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $generator->assertUnique('261009_C101');
     }
 }

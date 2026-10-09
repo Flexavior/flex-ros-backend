@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Crm\CrmConfigLimits;
+use App\Domain\Crm\LeadPicklistService;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\Setting;
@@ -10,6 +12,9 @@ use Illuminate\Validation\ValidationException;
 
 class SettingsController extends Controller
 {
+    public function __construct(protected LeadPicklistService $leadPicklists)
+    {
+    }
     /** GET /api/v1/stages — stage catalogue + dynamic checklist definitions. */
     public function stages()
     {
@@ -86,6 +91,34 @@ class SettingsController extends Controller
     public function roles()
     {
         return response()->json(Role::orderBy('level')->get());
+    }
+
+    /** GET /api/v1/settings/lead-picklists — dropdown catalogues (settings-backed). */
+    public function getLeadPicklists()
+    {
+        return response()->json($this->leadPicklists->all());
+    }
+
+    /** PUT /api/v1/settings/lead-picklists — admin: edit option lists (industry, geo, segment…). */
+    public function updateLeadPicklists(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        $keys = $this->leadPicklists->catalogKeys();
+        $unknown = array_diff(array_keys($request->all()), $keys);
+        if ($unknown !== []) {
+            throw ValidationException::withMessages([
+                (string) array_values($unknown)[0] => ['Unknown picklist catalogue key.'],
+            ]);
+        }
+        $rules = [];
+        foreach ($keys as $key) {
+            $rules[$key] = 'sometimes|array|max:'.CrmConfigLimits::PICKLIST_OPTIONS_MAX_COUNT;
+            $rules["{$key}.*"] = 'string|max:'.CrmConfigLimits::PICKLIST_OPTION_MAX_LENGTH;
+        }
+        $data = $request->validate($rules);
+
+        return response()->json($this->leadPicklists->put($data, $request->user()->id));
     }
 
     protected function authorizeAdmin(Request $request): void
