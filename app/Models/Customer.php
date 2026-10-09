@@ -10,8 +10,8 @@ class Customer extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'client_id', 'name', 'company', 'email', 'phone', 'status',
-        'address', 'lead_id', 'owner_id', 'created_by',
+        'client_id', 'name', 'company', 'customer_segment', 'industry', 'geo_location',
+        'email', 'phone', 'status', 'address', 'lead_id', 'owner_id', 'created_by',
     ];
 
     public function lead() { return $this->belongsTo(Lead::class); }

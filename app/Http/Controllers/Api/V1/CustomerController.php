@@ -6,15 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Domain\Crm\ChecklistService;
 use App\Domain\Crm\ClientIdGenerator;
 use App\Domain\Crm\CrmConfigLimits;
+use App\Domain\Crm\LeadPicklistService;
 use App\Domain\Crm\ScopeService;
 use App\Models\Customer;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
 {
     public function __construct(
         protected ScopeService $scopeService,
-        protected ChecklistService $checklistService
+        protected ChecklistService $checklistService,
+        protected LeadPicklistService $picklists,
     ) {
     }
 
@@ -39,7 +42,7 @@ class CustomerController extends Controller
         $this->authorizeView($request, $customer);
 
         return response()->json([
-            'customer' => $customer->load(['owner:id,name', 'products', 'agreements', 'launchPlans.dependencies']),
+            'customer' => $customer->load(['owner:id,name', 'products', 'agreements', 'launchPlans.dependencies', 'lead:id,name,industry,geo_location,customer_segment']),
             'checklists' => $this->checklistService->completionFor($customer),
         ]);
     }
@@ -55,6 +58,10 @@ class CustomerController extends Controller
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:'.CrmConfigLimits::CUSTOMER_ADDRESS_MAX,
+            'status' => ['sometimes', 'string', Rule::in(['active', 'onboarding', 'churned'])],
+            'customer_segment' => ['nullable', 'string', 'max:120', $this->picklists->rule('customer_segment')],
+            'industry' => ['nullable', 'string', 'max:120', $this->picklists->rule('industry')],
+            'geo_location' => ['nullable', 'string', 'max:120', $this->picklists->rule('geo_location')],
         ]);
 
         if (isset($data['client_id']) && $data['client_id'] !== $customer->client_id) {

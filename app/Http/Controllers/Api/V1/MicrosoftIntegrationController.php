@@ -6,6 +6,7 @@ use App\Domain\Microsoft\GraphSubscriptionService;
 use App\Domain\Microsoft\MicrosoftOAuthService;
 use App\Http\Controllers\Controller;
 use App\Models\MicrosoftConnection;
+use App\Support\SafeReturnPath;
 use Illuminate\Http\Request;
 use RuntimeException;
 
@@ -29,7 +30,12 @@ class MicrosoftIntegrationController extends Controller
             return response()->json(['message' => 'Microsoft integration is not configured on the server.'], 503);
         }
 
-        return response()->json(['url' => $oauth->authorizationUrl($request->user())]);
+        $data = $request->validate([
+            'return_path' => 'nullable|string|max:200',
+        ]);
+        $returnPath = SafeReturnPath::normalize($data['return_path'] ?? '/settings', '/settings');
+
+        return response()->json(['url' => $oauth->authorizationUrl($request->user(), $returnPath)]);
     }
 
     public function callback(Request $request, MicrosoftOAuthService $oauth, GraphSubscriptionService $subscriptions)
@@ -40,16 +46,24 @@ class MicrosoftIntegrationController extends Controller
         ]);
 
         $frontend = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        $returnPath = '/settings';
 
         try {
-            $connection = $oauth->handleCallback($request->query('code'), $request->query('state'));
+            $result = $oauth->handleCallback($request->query('code'), $request->query('state'));
+            $connection = $result['connection'];
+            $returnPath = $result['return_path'];
         } catch (RuntimeException $e) {
-            return redirect($frontend.'/settings?microsoft=error&msg='.urlencode($e->getMessage()));
+            $base = SafeReturnPath::normalize($returnPath, '/settings');
+            $sep = str_contains($base, '?') ? '&' : '?';
+
+            return redirect($frontend.$base.$sep.'microsoft=error&msg='.urlencode($e->getMessage()));
         }
 
         $subscriptions->ensureInboxSubscription($connection->user);
 
-        return redirect($frontend.'/settings?microsoft=connected');
+        $sep = str_contains($returnPath, '?') ? '&' : '?';
+
+        return redirect($frontend.$returnPath.$sep.'microsoft=connected');
     }
 
     public function disconnect(Request $request, MicrosoftOAuthService $oauth)

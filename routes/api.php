@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AppointmentController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ConvymesWebhookController;
 use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\Api\V1\DocumentTemplateController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\InboxController;
 use App\Http\Controllers\Api\V1\LaunchPlanController;
@@ -62,6 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Customers & checklists
     Route::apiResource('customers', CustomerController::class)->only(['index', 'show', 'update']);
+
+    Route::get('documents/templates', [DocumentTemplateController::class, 'index']);
+    Route::get('documents/templates/{documentTemplate}/download', [DocumentTemplateController::class, 'download']);
     Route::put('customers/{customer}/checklist/{itemId}', [CustomerController::class, 'toggleChecklist']);
 
     // Catalogue

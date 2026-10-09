@@ -71,6 +71,21 @@ class DashboardService
 
         $pendingAgreements = Agreement::whereIn('status', ['sent', 'in_review', 'pending_signature'])->count();
 
+        $maxIdle = Lead::qualifyMaxIdleTouches();
+        $qualifyBase = (clone $leadQuery)->open()->withQualifyIdleMetrics()
+            ->having('idle_touch_count', '>=', $maxIdle);
+        $qualifyCount = (clone $qualifyBase)->count();
+        $qualifySample = (clone $qualifyBase)
+            ->orderByDesc('idle_touch_count')
+            ->limit(8)
+            ->get(['id', 'name', 'company'])
+            ->map(fn (Lead $l) => [
+                'id' => $l->id,
+                'name' => $l->name,
+                'company' => $l->company,
+                'idle_touch_count' => $l->idle_touch_count,
+            ])->all();
+
         return [
             'stale_task_days' => $staleDays,
             'conversion_rate' => $conversionRate,
@@ -98,6 +113,12 @@ class DashboardService
                 'pending_approvals' => $campaigns['pending'] ?? 0,
             ],
             'pending_agreements' => $pendingAgreements,
+            'qualify_review' => [
+                'count' => $qualifyCount,
+                'max_idle_touches' => $maxIdle,
+                'items' => $qualifySample,
+            ],
+            'generated_at' => now()->toIso8601String(),
         ];
     }
 
