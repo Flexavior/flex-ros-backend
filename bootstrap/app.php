@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'inbox.agent' => \App\Http\Middleware\EnsureInboxAgent::class,
+            'crm.operational' => \App\Http\Middleware\EnsureCrmOperationalUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

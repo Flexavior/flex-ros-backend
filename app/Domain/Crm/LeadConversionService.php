@@ -21,7 +21,10 @@ class LeadConversionService
      * - instantiates dynamic stage checklists from System Settings
      * - marks the lead as converted
      */
-    public function convert(Lead $lead, array $productServiceIds = [], ?int $userId = null, ?string $clientId = null): Customer
+    /**
+     * @param  array<int, float|string|null>  $agreedPricesByProductId  product_service_id => agreed_price
+     */
+    public function convert(Lead $lead, array $productServiceIds = [], ?int $userId = null, ?string $clientId = null, array $agreedPricesByProductId = []): Customer
     {
         if ($lead->status === Lead::STATUS_CONVERTED) {
             throw new \InvalidArgumentException('Lead is already converted.');
@@ -33,7 +36,7 @@ class LeadConversionService
             $this->clientIdGenerator->assertUnique($clientId);
         }
 
-        return DB::transaction(function () use ($lead, $productServiceIds, $userId, $resolvedClientId) {
+        return DB::transaction(function () use ($lead, $productServiceIds, $userId, $resolvedClientId, $agreedPricesByProductId) {
             $customer = Customer::create([
                 'client_id' => $resolvedClientId,
                 'name' => $lead->name,
@@ -52,9 +55,12 @@ class LeadConversionService
             // Map products/services (pivot)
             $pivotRows = [];
             foreach (array_unique($productServiceIds) as $pid) {
+                $pid = (int) $pid;
+                $price = $agreedPricesByProductId[$pid] ?? $agreedPricesByProductId[(string) $pid] ?? null;
                 $pivotRows[] = [
                     'customer_id' => $customer->id,
-                    'product_service_id' => (int) $pid,
+                    'product_service_id' => $pid,
+                    'agreed_price' => $price !== null && $price !== '' ? $price : null,
                     'status' => 'active',
                     'created_at' => now(),
                     'updated_at' => now(),

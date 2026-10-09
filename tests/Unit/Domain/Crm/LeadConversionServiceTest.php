@@ -72,6 +72,27 @@ class LeadConversionServiceTest extends TestCase
         $this->assertTrue($customer->products->contains('id', $svcA->id));
     }
 
+    public function test_conversion_persists_agreed_prices(): void
+    {
+        $user = User::factory()->create();
+        $svc = ProductService::create(['code' => 'APP', 'name' => 'Mobile App Dev', 'type' => 'service', 'price' => 1000]);
+        $lead = Lead::factory()->create(['owner_id' => $user->id]);
+
+        $customer = app(LeadConversionService::class)->convert(
+            $lead,
+            [$svc->id],
+            $user->id,
+            null,
+            [$svc->id => 8500.50],
+        );
+
+        $this->assertDatabaseHas('customer_products', [
+            'customer_id' => $customer->id,
+            'product_service_id' => $svc->id,
+            'agreed_price' => 8500.50,
+        ]);
+    }
+
     // Client ID format + uniqueness on conversion
     public function test_conversion_generates_client_id(): void
     {

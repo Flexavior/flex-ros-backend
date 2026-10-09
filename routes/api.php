@@ -42,15 +42,28 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
-    // Dashboard
-    Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
-
-    // Admin console (system administrator)
+    // Admin console (system administrator — no operational CRM modules)
     Route::get('admin/overview', [AdminConsoleController::class, 'overview']);
 
     // User provisioning (SSO / Staff → operational roles)
     Route::get('users/provisioning', [UserProvisioningController::class, 'index']);
     Route::put('users/{user}/assign-role', [UserProvisioningController::class, 'assignRole']);
+
+    // Settings & stages (admin)
+    Route::get('stages', [SettingsController::class, 'stages']);
+    Route::get('settings/general', [SettingsController::class, 'getGeneral']);
+    Route::put('settings/general', [SettingsController::class, 'updateGeneral']);
+    Route::get('settings/checklists', [SettingsController::class, 'getChecklists']);
+    Route::put('settings/checklists', [SettingsController::class, 'updateChecklists']);
+    Route::get('settings/lead-picklists/defaults', [SettingsController::class, 'getLeadPicklistDefaults']);
+    Route::post('settings/lead-picklists/restore/{key}', [SettingsController::class, 'restoreLeadPicklist']);
+    Route::get('settings/lead-picklists', [SettingsController::class, 'getLeadPicklists']);
+    Route::put('settings/lead-picklists', [SettingsController::class, 'updateLeadPicklists']);
+    Route::get('roles', [SettingsController::class, 'roles']);
+
+    Route::middleware('crm.operational')->group(function () {
+    // Dashboard
+    Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
 
     // Leads & pipeline
     Route::get('leads/schema', [LeadController::class, 'schema']);
@@ -64,7 +77,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Customers & checklists
     Route::apiResource('customers', CustomerController::class)->only(['index', 'show', 'update']);
 
+    Route::get('documents/capabilities', [DocumentTemplateController::class, 'capabilities']);
     Route::get('documents/templates', [DocumentTemplateController::class, 'index']);
+    Route::post('documents/templates', [DocumentTemplateController::class, 'store']);
     Route::get('documents/templates/{documentTemplate}/download', [DocumentTemplateController::class, 'download']);
     Route::put('customers/{customer}/checklist/{itemId}', [CustomerController::class, 'toggleChecklist']);
 
@@ -111,13 +126,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('leads/{lead}/email', [MicrosoftMailController::class, 'sendLead']);
     Route::post('customers/{customer}/email', [MicrosoftMailController::class, 'sendCustomer']);
 
-    // Settings & stages
-    Route::get('stages', [SettingsController::class, 'stages']);
-    Route::get('settings/general', [SettingsController::class, 'getGeneral']);
-    Route::put('settings/general', [SettingsController::class, 'updateGeneral']);
-    Route::get('settings/checklists', [SettingsController::class, 'getChecklists']);
-    Route::put('settings/checklists', [SettingsController::class, 'updateChecklists']);
-    Route::get('settings/lead-picklists', [SettingsController::class, 'getLeadPicklists']);
-    Route::put('settings/lead-picklists', [SettingsController::class, 'updateLeadPicklists']);
-    Route::get('roles', [SettingsController::class, 'roles']);
+    }); // crm.operational
 });

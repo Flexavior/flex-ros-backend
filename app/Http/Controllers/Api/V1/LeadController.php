@@ -137,7 +137,7 @@ class LeadController extends Controller
     {
         abort_unless($this->scopeService->canAccessLead($request->user(), $lead), 403);
 
-        return response()->json($lead->load([
+        $lead->load([
             'owner:id,name', 'stage:id,code,name', 'customer:id,client_id,name',
             'engagements.user:id,name', 'engagements.assignedOwner:id,name', 'appointments.user:id,name', 'contacts',
         ])->loadCount([
@@ -147,7 +147,12 @@ class LeadController extends Controller
                     $w->whereNull('activity_outcome')->orWhereNotIn('activity_outcome', $progress);
                 });
             },
-        ]));
+        ]);
+
+        $payload = $lead->toArray();
+        $payload['legacy_picklist_warnings'] = $this->picklists->legacyWarningsForLead($lead);
+
+        return response()->json($payload);
     }
 
     public function update(Request $request, Lead $lead)
@@ -283,6 +288,8 @@ class LeadController extends Controller
         $data = $request->validate([
             'product_service_ids' => 'nullable|array',
             'product_service_ids.*' => 'integer|exists:products_services,id',
+            'agreed_prices' => 'nullable|array',
+            'agreed_prices.*' => 'nullable|numeric|min:0',
             'client_id' => 'nullable|string|max:30',
         ]);
 
@@ -297,6 +304,7 @@ class LeadController extends Controller
                 $data['product_service_ids'] ?? [],
                 $request->user()->id,
                 $data['client_id'] ?? null,
+                $data['agreed_prices'] ?? [],
             );
         } catch (\InvalidArgumentException $e) {
             abort(422, $e->getMessage());

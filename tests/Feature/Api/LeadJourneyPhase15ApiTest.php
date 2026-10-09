@@ -140,6 +140,29 @@ class LeadJourneyPhase15ApiTest extends TestCase
             ->assertJsonPath('industry', 'Education');
     }
 
+    public function test_customer_update_normalizes_imported_active_status_label(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $ceo = User::where('email', 'ceo@mss.test')->first();
+        $customer = Customer::create([
+            'client_id' => '261009_C901',
+            'name' => 'Imported Co',
+            'status' => 'Active',
+            'owner_id' => null,
+            'lead_id' => null,
+        ]);
+
+        $this->actingAs($ceo)
+            ->putJson("/api/v1/customers/{$customer->id}", [
+                'status' => 'Active',
+                'phone' => '+959123456',
+                'customer_segment' => 'SME',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'active')
+            ->assertJsonPath('phone', '+959123456');
+    }
+
     public function test_customer_address_is_updatable(): void
     {
         $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
