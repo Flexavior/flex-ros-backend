@@ -24,6 +24,16 @@ class Role extends Model
     /** Roles allowed to approve campaigns / sign-offs. */
     public const APPROVERS = [self::CEO, self::SENIOR_MANAGEMENT, self::SUPERVISOR];
 
+    /** Roles allowed to access Leads and Customers modules. */
+    public const SALES_CRM = [
+        self::CEO,
+        self::SENIOR_MANAGEMENT,
+        self::SUPERVISOR,
+        self::SENIOR_STAFF,
+        self::STAFF,
+        self::SALES,
+    ];
+
     /**
      * Roles that may own/answer an omnichannel conversation.
      * `customer_service` is seeded now so conversations can be delegated to a

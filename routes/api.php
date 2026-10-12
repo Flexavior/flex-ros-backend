@@ -66,33 +66,40 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
 
     // Leads & pipeline
-    Route::get('leads/schema', [LeadController::class, 'schema']);
-    Route::apiResource('leads', LeadController::class);
-    Route::post('leads/{lead}/engagements', [LeadController::class, 'storeEngagement']);
-    Route::post('leads/{lead}/convert', [LeadController::class, 'convert']);
+    Route::get('leads/schema', [LeadController::class, 'schema'])->middleware('crm.sales');
+    Route::apiResource('leads', LeadController::class)->middleware('crm.sales');
+    Route::post('leads/{lead}/engagements', [LeadController::class, 'storeEngagement'])->middleware('crm.sales');
+    Route::post('leads/{lead}/convert', [LeadController::class, 'convert'])->middleware('crm.sales');
 
     // Appointments
-    Route::apiResource('appointments', AppointmentController::class)->only(['index', 'store', 'update']);
+    Route::apiResource('appointments', AppointmentController::class)
+        ->only(['index', 'store', 'update'])
+        ->middleware('crm.sales');
 
     // Customers & checklists
-    Route::apiResource('customers', CustomerController::class)->only(['index', 'show', 'update']);
+    Route::apiResource('customers', CustomerController::class)
+        ->only(['index', 'show', 'update'])
+        ->middleware('crm.sales');
 
     Route::get('documents/capabilities', [DocumentTemplateController::class, 'capabilities']);
     Route::get('documents/templates', [DocumentTemplateController::class, 'index']);
     Route::post('documents/templates', [DocumentTemplateController::class, 'store']);
     Route::get('documents/templates/{documentTemplate}/download', [DocumentTemplateController::class, 'download']);
-    Route::put('customers/{customer}/checklist/{itemId}', [CustomerController::class, 'toggleChecklist']);
+    Route::put('customers/{customer}/checklist/{itemId}', [CustomerController::class, 'toggleChecklist'])
+        ->middleware('crm.sales');
 
     // Catalogue
     Route::apiResource('products-services', ProductServiceController::class);
 
     // Agreements (NDA / MoU / Contract)
-    Route::apiResource('agreements', AgreementController::class);
+    Route::apiResource('agreements', AgreementController::class)->middleware('crm.sales');
 
     // Launch plans & dependencies
-    Route::apiResource('launch-plans', LaunchPlanController::class);
-    Route::post('launch-plans/{launchPlan}/dependencies', [LaunchPlanController::class, 'storeDependency']);
-    Route::put('launch-dependencies/{dependency}', [LaunchPlanController::class, 'updateDependency']);
+    Route::apiResource('launch-plans', LaunchPlanController::class)->middleware('crm.sales');
+    Route::post('launch-plans/{launchPlan}/dependencies', [LaunchPlanController::class, 'storeDependency'])
+        ->middleware('crm.sales');
+    Route::put('launch-dependencies/{dependency}', [LaunchPlanController::class, 'updateDependency'])
+        ->middleware('crm.sales');
 
     // Marketing
     Route::get('marketing/channels', [MarketingController::class, 'channels']);
@@ -123,8 +130,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('integrations/microsoft/status', [MicrosoftIntegrationController::class, 'status']);
     Route::post('integrations/microsoft/connect', [MicrosoftIntegrationController::class, 'connect']);
     Route::delete('integrations/microsoft/disconnect', [MicrosoftIntegrationController::class, 'disconnect']);
-    Route::post('leads/{lead}/email', [MicrosoftMailController::class, 'sendLead']);
-    Route::post('customers/{customer}/email', [MicrosoftMailController::class, 'sendCustomer']);
+    Route::post('leads/{lead}/email', [MicrosoftMailController::class, 'sendLead'])->middleware('crm.sales');
+    Route::post('customers/{customer}/email', [MicrosoftMailController::class, 'sendCustomer'])->middleware('crm.sales');
 
     }); // crm.operational
 });

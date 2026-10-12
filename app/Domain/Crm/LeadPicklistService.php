@@ -79,7 +79,7 @@ class LeadPicklistService
                 'Other',
             ],
             'contact_role' => ['Owner', 'Director', 'Manager', 'Staff', 'Procurement', 'IT', 'Other'],
-            'current_stage' => ['New', 'Contacted', 'Qualified', 'Demo / Meeting', 'Proposal', 'Negotiation', 'Won', 'Lost'],
+            'current_stage' => ['New', 'Contacted', 'Qualified', 'Demo / Meeting', 'Proposal Sent', 'Negotiation', 'Won', 'Lost'],
             'interest_level' => ['Hot', 'Warm', 'Cold'],
             'buying_timeline' => ['Immediate', '1 Month', '3 Months', '6 Months', 'Unknown'],
             'contact_method' => ['Call', 'Email', 'Viber', 'LINE', 'Facebook', 'Telegram', 'Meeting', 'Other'],

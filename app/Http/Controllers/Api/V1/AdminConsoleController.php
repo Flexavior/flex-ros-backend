@@ -35,7 +35,7 @@ class AdminConsoleController extends Controller
             ],
             'crm' => [
                 'stale_task_days' => (int) Setting::get('crm.stale_task_days', 5),
-                'client_id_prefix' => Setting::get('crm.client_id_prefix', 'CUS'),
+                'client_id_format' => 'YYMMDD_C{n} (ClientIdGenerator)',
             ],
         ]);
     }

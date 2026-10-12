@@ -154,6 +154,7 @@ class LeadController extends Controller
 
         $payload = $lead->toArray();
         $payload['legacy_picklist_warnings'] = $this->picklists->legacyWarningsForLead($lead);
+        $payload = $this->normalizeLeadShowPayload($payload);
 
         return response()->json($payload);
     }
@@ -450,6 +451,7 @@ class LeadController extends Controller
             'qualified' => 'qualified',
             'demo / meeting' => 'appointment',
             'proposal' => 'qualified',
+            'proposal sent' => 'qualified',
             'negotiation' => 'qualified',
             'won' => 'converted',
             'lost' => 'lost',
@@ -480,5 +482,29 @@ class LeadController extends Controller
         if (!empty($data['lead_source'])) {
             $data['source'] = $data['lead_source'];
         }
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function normalizeLeadShowPayload(array $payload): array
+    {
+        foreach (['contacts', 'engagements', 'appointments'] as $key) {
+            if (!isset($payload[$key]) || !is_array($payload[$key])) {
+                $payload[$key] = [];
+            }
+        }
+
+        $cf = $payload['custom_fields'] ?? null;
+        if (is_string($cf)) {
+            $decoded = json_decode($cf, true);
+            $payload['custom_fields'] = is_array($decoded) ? $decoded : [];
+        } elseif (!is_array($cf)) {
+            $payload['custom_fields'] = [];
+        }
+
+        if (!is_array($payload['legacy_picklist_warnings'] ?? null)) {
+            $payload['legacy_picklist_warnings'] = [];
+        }
+
+        return $payload;
     }
 }

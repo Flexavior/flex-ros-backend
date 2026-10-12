@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'inbox.agent' => \App\Http\Middleware\EnsureInboxAgent::class,
             'crm.operational' => \App\Http\Middleware\EnsureCrmOperationalUser::class,
+            'crm.sales' => \App\Http\Middleware\EnsureSalesCrmUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
