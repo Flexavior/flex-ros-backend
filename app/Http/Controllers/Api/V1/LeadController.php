@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Crm\CrmConfigLimits;
+use App\Domain\Crm\CrmListSearch;
 use App\Domain\Crm\LeadPicklistService;
 use App\Domain\Crm\ScopeService;
 use App\Models\CrmFieldDefinition;
@@ -56,6 +57,8 @@ class LeadController extends Controller
             $days = (int) (\App\Models\Setting::get('crm.stale_task_days', 5));
             $query->stale($days);
         }
+
+        $query = CrmListSearch::applyLeadSearch($query, $request->query('q'));
 
         $perPage = min(
             max($request->integer('per_page', CrmConfigLimits::LIST_PER_PAGE_DEFAULT), 1),

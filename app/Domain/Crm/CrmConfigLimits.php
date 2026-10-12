@@ -21,6 +21,9 @@ final class CrmConfigLimits
 
     public const LIST_PAGE_MAX = 500;
 
+    /** Max length for list `q` free-text search. */
+    public const LIST_SEARCH_QUERY_MAX = 120;
+
     public const TEXT_FIELD_MAX = 65535;
 
     public const NOTES_MAX = 5000;

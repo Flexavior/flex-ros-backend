@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domain\Crm\ChecklistService;
 use App\Domain\Crm\ClientIdGenerator;
 use App\Domain\Crm\CrmConfigLimits;
+use App\Domain\Crm\CrmListSearch;
 use App\Domain\Crm\CustomerStatus;
 use App\Domain\Crm\LeadPicklistService;
 use App\Domain\Crm\ScopeService;
@@ -28,6 +29,7 @@ class CustomerController extends Controller
             ->orderByDesc('created_at');
 
         $query = $this->scopeService->applyCustomerScope($query, $request->user());
+        $query = CrmListSearch::applyCustomerSearch($query, $request->query('q'));
 
         $perPage = min(
             max($request->integer('per_page', CrmConfigLimits::LIST_PER_PAGE_DEFAULT), 1),
