@@ -71,7 +71,6 @@ class SettingsController extends Controller
 
         return response()->json([
             'crm.stale_task_days' => Setting::get('crm.stale_task_days', 5),
-            'crm.client_id_prefix' => Setting::get('crm.client_id_prefix', 'CUS'),
             'crm.qualify' => $qualify,
         ]);
     }
@@ -82,7 +81,6 @@ class SettingsController extends Controller
 
         $data = $request->validate([
             'crm.stale_task_days' => 'sometimes|integer|min:1|max:90',
-            'crm.client_id_prefix' => 'sometimes|string|max:10',
         ]);
 
         $requestData = $request->all();

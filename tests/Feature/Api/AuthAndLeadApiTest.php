@@ -48,6 +48,30 @@ class AuthAndLeadApiTest extends TestCase
         $this->getJson('/api/v1/auth/me')->assertStatus(401);
     }
 
+    public function test_non_sales_crm_roles_cannot_access_leads_or_customers(): void
+    {
+        $this->seedRoles();
+
+        foreach (['marketing@mss.test', 'cs@mss.test', 'admin@mss.test'] as $email) {
+            $user = User::where('email', $email)->firstOrFail();
+
+            $leadResponse = $this->actingAs($user)
+                ->getJson('/api/v1/leads')
+                ->assertForbidden();
+
+            if ($email !== 'admin@mss.test') {
+                $leadResponse->assertJsonPath(
+                    'message',
+                    'Leads and Customers are not available for your role. Contact your supervisor if you need access.'
+                );
+            }
+
+            $this->actingAs($user)
+                ->getJson('/api/v1/customers')
+                ->assertForbidden();
+        }
+    }
+
     // FT-03: sales creates a lead, owner auto-set
     public function test_sales_can_create_lead(): void
     {

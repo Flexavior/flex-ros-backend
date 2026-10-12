@@ -27,6 +27,7 @@ class Lead extends Model
         'Qualified',
         'Demo / Meeting',
         'Proposal',
+        'Proposal Sent',
         'Negotiation',
         'Won',
     ];
