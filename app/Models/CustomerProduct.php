@@ -8,11 +8,15 @@ class CustomerProduct extends Model
 {
     protected $table = 'customer_products';
 
-    protected $fillable = ['customer_id', 'product_service_id', 'agreed_price', 'status'];
+    protected $fillable = ['customer_id', 'product_service_id', 'agreed_price', 'unit', 'unit_price', 'status'];
 
     protected function casts(): array
     {
-        return ['agreed_price' => 'decimal:2'];
+        return [
+            'agreed_price' => 'decimal:2',
+            'unit' => 'decimal:4',
+            'unit_price' => 'decimal:2',
+        ];
     }
 
     public function customer() { return $this->belongsTo(Customer::class); }

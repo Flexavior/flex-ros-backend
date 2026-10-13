@@ -23,6 +23,8 @@ class LeadPicklistService
         'lead_source',
         'product_interest',
         'current_stage',
+        'engagement_channel',
+        'contact_method',
     ];
 
     /** Default organization / buyer type (not marketing lead_source). */
@@ -97,7 +99,8 @@ class LeadPicklistService
             'current_stage' => ['New', 'Contacted', 'Qualified', 'Demo / Meeting', 'Proposal Sent', 'Negotiation', 'Won', 'Lost'],
             'interest_level' => ['Hot', 'Warm', 'Cold'],
             'buying_timeline' => ['Immediate', '1 Month', '3 Months', '6 Months', 'Unknown'],
-            'contact_method' => ['Call', 'Email', 'Viber', 'LINE', 'Facebook', 'Telegram', 'Meeting', 'Other'],
+            'engagement_channel' => ['Phone', 'Facebook', 'Visit', 'Viber', 'Telegram', 'Discord', 'Teams', 'Email'],
+            'contact_method' => ['Call', 'Email', 'SMS/Message', 'Meeting', 'Other'],
             'activity_outcome' => [
                 'No response',
                 'Connected',
@@ -185,20 +188,36 @@ class LeadPicklistService
     /**
      * @return list<array{field: string, value: string}>
      */
+    /** Lead columns validated against a picklist key other than the column name. */
+    private const LEAD_PICKLIST_FIELD_MAP = [
+        'primary_contact_method' => 'contact_method',
+    ];
+
     public function legacyWarningsForLead(\App\Models\Lead $lead): array
     {
         $warnings = [];
         foreach (self::ADMIN_UI_KEYS as $field) {
-            $value = $lead->{$field};
-            if ($value === null || $value === '') {
-                continue;
-            }
-            if (!in_array((string) $value, $this->options($field), true)) {
-                $warnings[] = ['field' => $field, 'value' => (string) $value];
-            }
+            $this->appendLegacyWarning($warnings, $field, $lead->{$field});
+        }
+        foreach (self::LEAD_PICKLIST_FIELD_MAP as $field => $picklistKey) {
+            $this->appendLegacyWarning($warnings, $field, $lead->{$field}, $picklistKey);
         }
 
         return $warnings;
+    }
+
+    /**
+     * @param  list<array{field: string, value: string}>  $warnings
+     */
+    private function appendLegacyWarning(array &$warnings, string $field, mixed $value, ?string $picklistKey = null): void
+    {
+        if ($value === null || $value === '') {
+            return;
+        }
+        $key = $picklistKey ?? $field;
+        if (!in_array((string) $value, $this->options($key), true)) {
+            $warnings[] = ['field' => $field, 'value' => (string) $value];
+        }
     }
 
     public function rule(string $key, bool $sometimes = false): array

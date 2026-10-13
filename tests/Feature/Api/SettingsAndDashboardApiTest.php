@@ -77,6 +77,31 @@ class SettingsAndDashboardApiTest extends TestCase
         $this->assertSame(2, $data['stale_tasks']['count']);
     }
 
+    public function test_dashboard_funnel_groups_by_current_stage(): void
+    {
+        $this->seedRoles();
+        $ceo = User::where('email', 'ceo@mss.test')->first();
+
+        \App\Models\Lead::factory()->create([
+            'current_stage' => 'Qualified',
+            'status' => 'qualified',
+        ]);
+        \App\Models\Lead::factory()->create([
+            'current_stage' => 'Qualified',
+            'status' => 'new',
+        ]);
+        \App\Models\Lead::factory()->create([
+            'current_stage' => 'Negotiation',
+            'status' => 'qualified',
+        ]);
+
+        $funnel = $this->actingAs($ceo)->getJson('/api/v1/dashboard/metrics')->json('funnel');
+
+        $this->assertSame(2, $funnel['Qualified'] ?? 0);
+        $this->assertSame(1, $funnel['Negotiation'] ?? 0);
+        $this->assertArrayNotHasKey('new', $funnel);
+    }
+
     // FT-11: marketing approval flow
     public function test_campaign_approval_flow(): void
     {

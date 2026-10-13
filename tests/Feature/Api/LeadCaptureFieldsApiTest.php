@@ -62,13 +62,13 @@ class LeadCaptureFieldsApiTest extends TestCase
             ->putJson("/api/v1/leads/{$lead->id}", [
                 'interest_level' => 'Hot',
                 'buying_timeline' => '1 Month',
-                'primary_contact_method' => 'Viber',
+                'primary_contact_method' => 'SMS/Message',
                 'contact_role' => 'Director',
             ])
             ->assertOk()
             ->assertJsonPath('interest_level', 'Hot')
             ->assertJsonPath('buying_timeline', '1 Month')
-            ->assertJsonPath('primary_contact_method', 'Viber')
+            ->assertJsonPath('primary_contact_method', 'SMS/Message')
             ->assertJsonPath('contact_role', 'Director');
     }
 
@@ -89,5 +89,26 @@ class LeadCaptureFieldsApiTest extends TestCase
             ->assertJsonMissingPath('source')
             ->assertJsonPath('legacy_picklist_warnings.0.field', 'industry')
             ->assertJsonPath('legacy_picklist_warnings.0.value', 'Pre-Migration Industry Label');
+    }
+
+    public function test_lead_show_warns_legacy_primary_contact_method(): void
+    {
+        $this->seed(\Database\Seeders\RoleAndUserSeeder::class);
+        $sales = User::where('email', 'sales@mss.test')->first();
+
+        $lead = Lead::factory()->create([
+            'owner_id' => $sales->id,
+            'primary_contact_method' => 'Viber',
+        ]);
+
+        $warnings = $this->actingAs($sales)
+            ->getJson("/api/v1/leads/{$lead->id}")
+            ->assertOk()
+            ->json('legacy_picklist_warnings');
+
+        $this->assertContains(
+            ['field' => 'primary_contact_method', 'value' => 'Viber'],
+            $warnings
+        );
     }
 }

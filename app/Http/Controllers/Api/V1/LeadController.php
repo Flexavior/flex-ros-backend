@@ -13,6 +13,7 @@ use App\Models\Lead;
 use App\Models\LeadContact;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class LeadController extends Controller
@@ -246,7 +247,7 @@ class LeadController extends Controller
         abort_unless($this->scopeService->canAccessLead($request->user(), $lead), 403);
 
         $data = $request->validate([
-            'channel' => 'nullable|string|max:50',
+            'channel' => $this->picklists->rule('engagement_channel', true),
             'summary' => 'nullable|string|max:'.CrmConfigLimits::ENGAGEMENT_SUMMARY_MAX,
             'occurred_at' => 'nullable|date',
             'contact_method' => $this->picklists->rule('contact_method'),
@@ -309,6 +310,8 @@ class LeadController extends Controller
             'product_service_ids.*' => 'integer|exists:products_services,id',
             'agreed_prices' => 'nullable|array',
             'agreed_prices.*' => 'nullable|numeric|min:0',
+            'agreed_units' => 'nullable|array',
+            'agreed_units.*' => 'nullable|numeric|min:0.0001',
             'client_id' => 'nullable|string|max:30',
         ]);
 
@@ -324,9 +327,14 @@ class LeadController extends Controller
                 $request->user()->id,
                 $data['client_id'] ?? null,
                 $data['agreed_prices'] ?? [],
+                $data['agreed_units'] ?? [],
             );
         } catch (\InvalidArgumentException $e) {
+            Log::warning('Lead convert rejected', ['lead_id' => $lead->id, 'message' => $e->getMessage()]);
             abort(422, $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error('Lead convert failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+            abort(500, 'Conversion failed. Please try again or contact support.');
         }
 
         return response()->json($customer, 201);

@@ -93,6 +93,29 @@ class LeadConversionServiceTest extends TestCase
         ]);
     }
 
+    public function test_conversion_computes_unit_price_from_agreed_and_units(): void
+    {
+        $user = User::factory()->create();
+        $svc = ProductService::create(['code' => 'LIC', 'name' => 'License', 'type' => 'service']);
+        $lead = Lead::factory()->create(['owner_id' => $user->id]);
+
+        app(LeadConversionService::class)->convert(
+            $lead,
+            [$svc->id],
+            $user->id,
+            null,
+            [$svc->id => 1000],
+            [$svc->id => 4],
+        );
+
+        $this->assertDatabaseHas('customer_products', [
+            'product_service_id' => $svc->id,
+            'agreed_price' => 1000,
+            'unit' => 4,
+            'unit_price' => 250,
+        ]);
+    }
+
     // Client ID format + uniqueness on conversion
     public function test_conversion_generates_client_id(): void
     {

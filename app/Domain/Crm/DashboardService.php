@@ -39,10 +39,16 @@ class DashboardService
         // Conversion rate: converted / total created (0 when no leads yet)
         $conversionRate = $totalLeads > 0 ? round($convertedLeads / $totalLeads * 100, 1) : 0.0;
 
+        // Pipeline funnel by picklist stage (not legacy status slug).
         $funnel = (clone $leadQuery)
-            ->selectRaw('status, COUNT(*) as cnt')
-            ->groupBy('status')
-            ->pluck('cnt', 'status')
+            ->get(['current_stage'])
+            ->groupBy(function (Lead $lead) {
+                $stage = trim((string) ($lead->current_stage ?? ''));
+
+                return $stage !== '' ? $stage : 'Unstaged';
+            })
+            ->map->count()
+            ->sortKeys()
             ->all();
 
         // Stale open leads: status not changed within threshold

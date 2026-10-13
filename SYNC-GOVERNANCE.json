@@ -1,16 +1,16 @@
 ﻿{
-    "cr":  "CR131026-Lead-Field-Canonical-Pipeline-UX",
+    "cr":  "CR141026-Lead-UX-Funnel-FollowUp-Products",
     "tik":  [
-                "TIK131026-017-be-lead-field-canonical",
-                "TIK131026-018-fe-lead-detail-pipeline-ux"
+                "TIK141026-019-be-funnel-followup-products",
+                "TIK141026-020-fe-action-feedback-inputs"
             ],
-    "synced_at_utc":  "2026-10-13T06:29:54.7539094Z",
+    "synced_at_utc":  "2026-10-13T10:15:50.9715322Z",
     "sync_mode":  "incremental",
     "source_root":  "C:\\laragon\\www\\mss-crm",
     "mirrors":  [
                     "P:\\ghUpload\\flex-ros-backend",
                     "P:\\ghUpload\\flex-ros-frontend"
                 ],
-    "release_note":  "Canonical lead fields, normalizer command, lead detail pipeline UX (auto from INDEX 2026-10-13)",
+    "release_note":  "Funnel by stage, follow-up picklists, product units, save feedback (auto from INDEX 2026-10-13)",
     "last_trigger_destination":  "P:\\ghUpload\\flex-ros-backend"
 }
