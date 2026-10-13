@@ -22,11 +22,24 @@ class GraphMailService
 
     public function sendToLead(User $sender, Lead $lead, string $subject, string $body): array
     {
-        if (!$lead->email) {
-            throw new RuntimeException('Lead has no email address.');
+        $lead->loadMissing('contacts');
+        $toEmail = trim((string) ($lead->email ?? ''));
+        $toName = $lead->name;
+
+        if ($toEmail === '') {
+            $primary = $lead->contacts->firstWhere('is_primary', true)
+                ?? $lead->contacts->first(fn ($c) => trim((string) ($c->email ?? '')) !== '');
+            $toEmail = trim((string) ($primary->email ?? ''));
+            if ($primary?->name) {
+                $toName = $primary->name;
+            }
         }
 
-        return $this->send($sender, $lead->email, $lead->name, $subject, $body, [
+        if ($toEmail === '') {
+            throw new RuntimeException('Lead has no email address. Add email on the lead or primary contact.');
+        }
+
+        return $this->send($sender, $toEmail, $toName, $subject, $body, [
             'lead_id' => $lead->id,
         ]);
     }
