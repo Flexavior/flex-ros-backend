@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Sales lead entity.
+ *
+ * Canonical API/UI fields: current_stage, lead_source, organization_type, customer_segment.
+ * Legacy DB columns source + status remain for SQL reimport; API omits `source` (see LeadFieldCanonical).
+ */
 class Lead extends Model
 {
     use HasFactory, SoftDeletes;
@@ -35,7 +41,7 @@ class Lead extends Model
     protected $fillable = [
         'name', 'company', 'email', 'phone', 'source', 'status', 'notes',
         'owner_id', 'customer_id', 'status_updated_at', 'created_by',
-        'lead_source', 'product_interest', 'customer_segment', 'geo_location', 'industry',
+        'lead_source', 'product_interest', 'organization_type', 'customer_segment', 'geo_location', 'industry',
         'contact_role', 'current_stage', 'interest_level', 'buying_timeline', 'primary_contact_method',
         'last_activity_outcome', 'custom_fields',
     ];

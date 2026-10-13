@@ -46,6 +46,10 @@ class LeadController extends Controller
             $this->picklists->assertFilterValue('customer_segment', (string) $segment);
             $query->where('customer_segment', $segment);
         }
+        if ($orgType = $request->query('organization_type')) {
+            $this->picklists->assertFilterValue('organization_type', (string) $orgType);
+            $query->where('organization_type', $orgType);
+        }
         if ($industry = $request->query('industry')) {
             $this->picklists->assertFilterValue('industry', (string) $industry);
             $query->where('industry', $industry);
@@ -68,11 +72,8 @@ class LeadController extends Controller
         $page = max(1, min($request->integer('page', 1), CrmConfigLimits::LIST_PAGE_MAX));
 
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
-        $paginator->getCollection()->transform(function (Lead $lead) {
-            return $this->pipelineSync->enrichLead($lead);
-        });
 
-        return response()->json($paginator);
+        return response()->json($paginator->through(fn (Lead $lead) => $this->leadApiResource($lead)));
     }
 
     public function schema()
@@ -93,9 +94,11 @@ class LeadController extends Controller
             'company' => 'nullable|string|max:255',
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:50',
+            // `source` accepted for SQL reimport/API compat; persisted mirror — prefer lead_source (see LeadFieldCanonical).
             'source' => 'nullable|string|max:50',
             'lead_source' => $this->picklists->rule('lead_source'),
             'product_interest' => $this->picklists->rule('product_interest'),
+            'organization_type' => $this->picklists->rule('organization_type'),
             'customer_segment' => $this->picklists->rule('customer_segment'),
             'geo_location' => $this->picklists->rule('geo_location'),
             'industry' => $this->picklists->rule('industry'),
@@ -119,6 +122,8 @@ class LeadController extends Controller
         ]);
         $this->validateCustomFieldValues($data['custom_fields'] ?? null, 'lead');
         $this->pipelineSync->syncWritableAttributes($data);
+        $this->pipelineSync->backfillCustomerSegmentLabels($data);
+        $this->pipelineSync->backfillOrganizationType($data);
 
         // Only supervisors+ can assign to someone else; sales always own their leads
         $user = $request->user();
@@ -140,9 +145,7 @@ class LeadController extends Controller
                 });
             },
         ]);
-        $this->pipelineSync->enrichLead($lead);
-
-        return response()->json($lead, 201);
+        return response()->json($this->leadApiResource($lead), 201);
     }
 
     public function show(Request $request, Lead $lead)
@@ -161,10 +164,8 @@ class LeadController extends Controller
             },
         ]);
 
-        $payload = $lead->toArray();
+        $payload = $this->leadApiResource($lead, detail: true);
         $payload['legacy_picklist_warnings'] = $this->picklists->legacyWarningsForLead($lead);
-        $payload = $this->normalizeLeadShowPayload($payload);
-        $payload = $this->pipelineSync->enrichApiPayload($payload);
 
         return response()->json($payload);
     }
@@ -181,6 +182,7 @@ class LeadController extends Controller
             'source' => 'nullable|string|max:50',
             'lead_source' => $this->picklists->rule('lead_source', true),
             'product_interest' => $this->picklists->rule('product_interest', true),
+            'organization_type' => $this->picklists->rule('organization_type', true),
             'customer_segment' => $this->picklists->rule('customer_segment', true),
             'geo_location' => $this->picklists->rule('geo_location', true),
             'industry' => $this->picklists->rule('industry', true),
@@ -205,6 +207,8 @@ class LeadController extends Controller
         ]);
         $this->validateCustomFieldValues($data['custom_fields'] ?? null, 'lead');
         $this->pipelineSync->syncWritableAttributes($data);
+        $this->pipelineSync->backfillCustomerSegmentLabels($data);
+        $this->pipelineSync->backfillOrganizationType($data);
 
         $user = $request->user();
         if (isset($data['owner_id']) && $data['owner_id'] != $user->id && !$user->canApprove()) {
@@ -224,9 +228,7 @@ class LeadController extends Controller
                 });
             },
         ]);
-        $this->pipelineSync->enrichLead($fresh);
-
-        return response()->json($fresh);
+        return response()->json($this->leadApiResource($fresh));
     }
 
     public function destroy(Request $request, Lead $lead)
@@ -454,6 +456,18 @@ class LeadController extends Controller
                 }
             }
         }
+    }
+
+    /** Canonical JSON shape for leads (strips legacy `source`, normalizes stage/source). */
+    private function leadApiResource(Lead $lead, bool $detail = false): array
+    {
+        $this->pipelineSync->enrichLead($lead);
+        $payload = $lead->toArray();
+        if ($detail) {
+            $payload = $this->normalizeLeadShowPayload($payload);
+        }
+
+        return $this->pipelineSync->enrichApiPayload($payload);
     }
 
     /** @param  array<string, mixed>  $payload */

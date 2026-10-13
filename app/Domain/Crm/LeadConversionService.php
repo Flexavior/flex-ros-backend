@@ -41,6 +41,7 @@ class LeadConversionService
                 'client_id' => $resolvedClientId,
                 'name' => $lead->name,
                 'company' => $lead->company,
+                'organization_type' => $lead->organization_type,
                 'customer_segment' => $lead->customer_segment,
                 'industry' => $lead->industry,
                 'geo_location' => $lead->geo_location,
