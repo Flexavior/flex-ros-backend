@@ -23,8 +23,16 @@ class LeadConversionService
      */
     /**
      * @param  array<int, float|string|null>  $agreedPricesByProductId  product_service_id => agreed_price
+     * @param  array<int, float|string|null>  $agreedUnitsByProductId  product_service_id => quantity (unit_price = agreed_price / unit)
      */
-    public function convert(Lead $lead, array $productServiceIds = [], ?int $userId = null, ?string $clientId = null, array $agreedPricesByProductId = []): Customer
+    public function convert(
+        Lead $lead,
+        array $productServiceIds = [],
+        ?int $userId = null,
+        ?string $clientId = null,
+        array $agreedPricesByProductId = [],
+        array $agreedUnitsByProductId = [],
+    ): Customer
     {
         if ($lead->status === Lead::STATUS_CONVERTED) {
             throw new \InvalidArgumentException('Lead is already converted.');
@@ -36,7 +44,7 @@ class LeadConversionService
             $this->clientIdGenerator->assertUnique($clientId);
         }
 
-        return DB::transaction(function () use ($lead, $productServiceIds, $userId, $resolvedClientId, $agreedPricesByProductId) {
+        return DB::transaction(function () use ($lead, $productServiceIds, $userId, $resolvedClientId, $agreedPricesByProductId, $agreedUnitsByProductId) {
             $customer = Customer::create([
                 'client_id' => $resolvedClientId,
                 'name' => $lead->name,
@@ -58,10 +66,18 @@ class LeadConversionService
             foreach (array_unique($productServiceIds) as $pid) {
                 $pid = (int) $pid;
                 $price = $agreedPricesByProductId[$pid] ?? $agreedPricesByProductId[(string) $pid] ?? null;
+                $unitRaw = $agreedUnitsByProductId[$pid] ?? $agreedUnitsByProductId[(string) $pid] ?? null;
+                $unit = ($unitRaw !== null && $unitRaw !== '') ? (float) $unitRaw : null;
+                $agreed = ($price !== null && $price !== '') ? (float) $price : null;
+                $unitPrice = ($agreed !== null && $unit !== null && $unit > 0)
+                    ? round($agreed / $unit, 2)
+                    : null;
                 $pivotRows[] = [
                     'customer_id' => $customer->id,
                     'product_service_id' => $pid,
-                    'agreed_price' => $price !== null && $price !== '' ? $price : null,
+                    'agreed_price' => $agreed,
+                    'unit' => $unit,
+                    'unit_price' => $unitPrice,
                     'status' => 'active',
                     'created_at' => now(),
                     'updated_at' => now(),

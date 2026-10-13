@@ -31,7 +31,7 @@ class Customer extends Model
     public function products()
     {
         return $this->belongsToMany(ProductService::class, 'customer_products', 'customer_id', 'product_service_id')
-            ->withPivot(['agreed_price', 'status'])
+            ->withPivot(['agreed_price', 'unit', 'unit_price', 'status'])
             ->withTimestamps();
     }
 
