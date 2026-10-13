@@ -4,7 +4,7 @@
                 "TIK131026-015-be-crm-module-access",
                 "TIK131026-016-fe-role-aware-list-states"
             ],
-    "synced_at_utc":  "2026-10-12T18:50:24.4806976Z",
+    "synced_at_utc":  "2026-10-13T02:20:30.6579219Z",
     "sync_mode":  "incremental",
     "source_root":  "C:\\laragon\\www\\mss-crm",
     "mirrors":  [
@@ -12,5 +12,5 @@
                     "P:\\ghUpload\\flex-ros-frontend"
                 ],
     "release_note":  "Branded list loading, scoped empty states, Leads/Customers module RBAC (auto from INDEX 2026-10-13)",
-    "last_trigger_destination":  "P:\\ghUpload\\flex-ros-frontend"
+    "last_trigger_destination":  "P:\\ghUpload\\flex-ros-backend"
 }

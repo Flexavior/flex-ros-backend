@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Domain\Crm\CrmConfigLimits;
 use App\Domain\Crm\CrmListSearch;
+use App\Domain\Crm\LeadPipelineSyncService;
 use App\Domain\Crm\LeadPicklistService;
 use App\Domain\Crm\ScopeService;
 use App\Models\CrmFieldDefinition;
@@ -12,7 +13,6 @@ use App\Models\Lead;
 use App\Models\LeadContact;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class LeadController extends Controller
@@ -20,12 +20,13 @@ class LeadController extends Controller
     public function __construct(
         protected ScopeService $scopeService,
         protected LeadPicklistService $picklists,
+        protected LeadPipelineSyncService $pipelineSync,
     ) {
     }
 
     public function index(Request $request)
     {
-        $query = Lead::with(['owner:id,name', 'stage:id,code,name', 'customer:id,client_id,name'])
+        $query = Lead::with(['owner:id,name', 'customer:id,client_id,name'])
             ->withQualifyIdleMetrics()
             ->orderByDesc('created_at');
 
@@ -66,7 +67,12 @@ class LeadController extends Controller
         );
         $page = max(1, min($request->integer('page', 1), CrmConfigLimits::LIST_PAGE_MAX));
 
-        return response()->json($query->paginate($perPage, ['*'], 'page', $page));
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        $paginator->getCollection()->transform(function (Lead $lead) {
+            return $this->pipelineSync->enrichLead($lead);
+        });
+
+        return response()->json($paginator);
     }
 
     public function schema()
@@ -112,7 +118,7 @@ class LeadController extends Controller
             'contacts.*.is_primary' => 'nullable|boolean',
         ]);
         $this->validateCustomFieldValues($data['custom_fields'] ?? null, 'lead');
-        $this->syncLegacyStatusColumns($data);
+        $this->pipelineSync->syncWritableAttributes($data);
 
         // Only supervisors+ can assign to someone else; sales always own their leads
         $user = $request->user();
@@ -126,14 +132,17 @@ class LeadController extends Controller
         $lead = Lead::create($data);
         $this->syncContacts($lead, $data['contacts'] ?? null);
 
-        return response()->json($lead->load(['owner:id,name', 'contacts'])->loadCount([
+        $lead = $lead->load(['owner:id,name', 'contacts'])->loadCount([
             'engagements as idle_touch_count' => function ($q) {
                 $progress = Lead::qualifyProgressOutcomes();
                 $q->where(function ($w) use ($progress) {
                     $w->whereNull('activity_outcome')->orWhereNotIn('activity_outcome', $progress);
                 });
             },
-        ]), 201);
+        ]);
+        $this->pipelineSync->enrichLead($lead);
+
+        return response()->json($lead, 201);
     }
 
     public function show(Request $request, Lead $lead)
@@ -141,7 +150,7 @@ class LeadController extends Controller
         abort_unless($this->scopeService->canAccessLead($request->user(), $lead), 403);
 
         $lead->load([
-            'owner:id,name', 'stage:id,code,name', 'customer:id,client_id,name',
+            'owner:id,name', 'customer:id,client_id,name',
             'engagements.user:id,name', 'engagements.assignedOwner:id,name', 'appointments.user:id,name', 'contacts',
         ])->loadCount([
             'engagements as idle_touch_count' => function ($q) {
@@ -155,6 +164,7 @@ class LeadController extends Controller
         $payload = $lead->toArray();
         $payload['legacy_picklist_warnings'] = $this->picklists->legacyWarningsForLead($lead);
         $payload = $this->normalizeLeadShowPayload($payload);
+        $payload = $this->pipelineSync->enrichApiPayload($payload);
 
         return response()->json($payload);
     }
@@ -194,7 +204,7 @@ class LeadController extends Controller
             'contacts.*.is_primary' => 'nullable|boolean',
         ]);
         $this->validateCustomFieldValues($data['custom_fields'] ?? null, 'lead');
-        $this->syncLegacyStatusColumns($data);
+        $this->pipelineSync->syncWritableAttributes($data);
 
         $user = $request->user();
         if (isset($data['owner_id']) && $data['owner_id'] != $user->id && !$user->canApprove()) {
@@ -206,14 +216,17 @@ class LeadController extends Controller
             $this->syncContacts($lead, $data['contacts']);
         }
 
-        return response()->json($lead->fresh(['owner:id,name', 'contacts'])->loadCount([
+        $fresh = $lead->fresh(['owner:id,name', 'contacts'])->loadCount([
             'engagements as idle_touch_count' => function ($q) {
                 $progress = Lead::qualifyProgressOutcomes();
                 $q->where(function ($w) use ($progress) {
                     $w->whereNull('activity_outcome')->orWhereNotIn('activity_outcome', $progress);
                 });
             },
-        ]));
+        ]);
+        $this->pipelineSync->enrichLead($fresh);
+
+        return response()->json($fresh);
     }
 
     public function destroy(Request $request, Lead $lead)
@@ -440,47 +453,6 @@ class LeadController extends Controller
                     throw ValidationException::withMessages(["custom_fields.{$fieldKey}" => ['Value is not in allowed options.']]);
                 }
             }
-        }
-    }
-
-    private function syncLegacyStatusColumns(array &$data): void
-    {
-        $stageToStatus = [
-            'new' => 'new',
-            'contacted' => 'contacted',
-            'qualified' => 'qualified',
-            'demo / meeting' => 'appointment',
-            'proposal' => 'qualified',
-            'proposal sent' => 'qualified',
-            'negotiation' => 'qualified',
-            'won' => 'converted',
-            'lost' => 'lost',
-        ];
-        $statusToStage = [
-            'new' => 'New',
-            'contacted' => 'Contacted',
-            'qualified' => 'Qualified',
-            'appointment' => 'Demo / Meeting',
-            'converted' => 'Won',
-            'lost' => 'Lost',
-        ];
-
-        if (!empty($data['current_stage']) && empty($data['status'])) {
-            $status = $stageToStatus[Str::lower((string) $data['current_stage'])] ?? null;
-            if ($status) {
-                $data['status'] = $status;
-            }
-        }
-
-        if (!empty($data['status']) && empty($data['current_stage'])) {
-            $data['current_stage'] = $statusToStage[$data['status']] ?? null;
-        }
-
-        if (!empty($data['source']) && empty($data['lead_source'])) {
-            $data['lead_source'] = $data['source'];
-        }
-        if (!empty($data['lead_source'])) {
-            $data['source'] = $data['lead_source'];
         }
     }
 
