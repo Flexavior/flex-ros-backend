@@ -16,12 +16,26 @@ class LeadPicklistService
 
     /** Keys editable in System Settings UI (one textarea each). */
     public const ADMIN_UI_KEYS = [
+        'organization_type',
         'customer_segment',
         'industry',
         'geo_location',
         'lead_source',
         'product_interest',
         'current_stage',
+    ];
+
+    /** Default organization / buyer type (not marketing lead_source). */
+    public const DEFAULT_ORGANIZATION_TYPES = [
+        'Private School',
+        'International School',
+        'Private Institute',
+        'Training Center',
+        'Education Organization',
+        'Distributor',
+        'Individual',
+        'NGO / Government',
+        'Other',
     ];
 
     /** Catalogues that must retain at least PICKLIST_MIN_OPTIONS_CRITICAL options on save. */
@@ -37,6 +51,7 @@ class LeadPicklistService
         return [
             'lead_source' => ['Referrals', 'Organic Search', 'Paid Ads', 'Social Media', 'Website', 'Events', 'Partner', 'Walk-in', 'Other'],
             'product_interest' => ['CRM', 'Marketing', 'Project Management', 'HR', 'Finance', 'Custom Integration', 'Other'],
+            'organization_type' => self::DEFAULT_ORGANIZATION_TYPES,
             'customer_segment' => ['Startup', 'SME', 'Enterprise', 'Government', 'Non-profit', 'Education', 'Other'],
             'industry' => [
                 'Banking & Finance',

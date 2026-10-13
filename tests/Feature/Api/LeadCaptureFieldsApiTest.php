@@ -86,6 +86,7 @@ class LeadCaptureFieldsApiTest extends TestCase
         $this->actingAs($sales)
             ->getJson("/api/v1/leads/{$lead->id}")
             ->assertOk()
+            ->assertJsonMissingPath('source')
             ->assertJsonPath('legacy_picklist_warnings.0.field', 'industry')
             ->assertJsonPath('legacy_picklist_warnings.0.value', 'Pre-Migration Industry Label');
     }

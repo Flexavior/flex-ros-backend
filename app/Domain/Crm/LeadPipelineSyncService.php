@@ -6,9 +6,8 @@ use App\Models\Lead;
 use Illuminate\Support\Str;
 
 /**
- * Single place for lead pipeline + source field sync.
- * Canonical UX fields: current_stage, lead_source.
- * Legacy mirrors (status, source) kept for queries/dashboard until fully migrated.
+ * Normalizes lead pipeline + source fields on read/write.
+ * All inbound/outbound shaping for canonical vs legacy columns lives here.
  */
 class LeadPipelineSyncService
 {
@@ -23,9 +22,10 @@ class LeadPipelineSyncService
         'negotiation' => Lead::STATUS_QUALIFIED,
         'won' => Lead::STATUS_CONVERTED,
         'lost' => Lead::STATUS_LOST,
+        'not qualified' => Lead::STATUS_LOST,
     ];
 
-    /** @var array<string, string> legacy status slug → default picklist label */
+    /** @var array<string, string> legacy status slug → default picklist label when stage empty */
     private const STATUS_TO_STAGE = [
         Lead::STATUS_NEW => 'New',
         Lead::STATUS_CONTACTED => 'Contacted',
@@ -34,30 +34,6 @@ class LeadPipelineSyncService
         Lead::STATUS_CONVERTED => 'Won',
         Lead::STATUS_LOST => 'Lost',
     ];
-
-    /** Normalize inbound create/update attributes (mutates array). */
-    public function syncWritableAttributes(array &$data): void
-    {
-        if (!empty($data['current_stage']) && empty($data['status'])) {
-            $status = self::STAGE_TO_STATUS[Str::lower(trim((string) $data['current_stage']))] ?? null;
-            if ($status) {
-                $data['status'] = $status;
-            }
-        }
-
-        if (!empty($data['status']) && empty($data['current_stage'])) {
-            $data['current_stage'] = self::STATUS_TO_STAGE[$data['status']] ?? null;
-        }
-
-        if (!empty($data['source']) && empty($data['lead_source'])) {
-            $data['lead_source'] = $data['source'];
-        }
-        if (!empty($data['lead_source'])) {
-            $data['source'] = $data['lead_source'];
-        }
-
-        unset($data['stage_id']);
-    }
 
     public function resolveStageLabel(?string $currentStage, ?string $status): string
     {
@@ -69,6 +45,55 @@ class LeadPipelineSyncService
         $slug = trim((string) ($status ?? ''));
 
         return self::STATUS_TO_STAGE[$slug] ?? ($slug !== '' ? ucfirst($slug) : 'New');
+    }
+
+    /**
+     * Merge legacy import columns into canonical attributes before persist.
+     * Keeps DB `source` / `status` mirrors in sync for reimported SQL rows.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function syncWritableAttributes(array &$data): void
+    {
+        $this->syncStageWritable($data);
+        $this->syncSourceWritable($data);
+        unset($data['stage_id']);
+    }
+
+    /**
+     * Map obsolete segment labels to current Settings catalogue (e.g. School → Education size band).
+     */
+    public function backfillCustomerSegmentLabels(array &$attributes): void
+    {
+        $segment = trim((string) ($attributes[LeadFieldCanonical::CUSTOMER_SEGMENT] ?? ''));
+        if ($segment === '') {
+            return;
+        }
+        if (strcasecmp($segment, 'School') === 0) {
+            $attributes[LeadFieldCanonical::CUSTOMER_SEGMENT] = 'Education';
+            if (empty($attributes[LeadFieldCanonical::ORGANIZATION_TYPE])) {
+                $attributes[LeadFieldCanonical::ORGANIZATION_TYPE] = 'Private School';
+            }
+        }
+    }
+
+    /**
+     * Backfill organization_type from customer_segment when segment mistakenly holds an org-type label (SQL reimport).
+     * Does not treat segment band "Education" as organization type — use organization_type for Private School, etc.
+     */
+    public function backfillOrganizationType(array &$attributes): void
+    {
+        if (!empty($attributes[LeadFieldCanonical::ORGANIZATION_TYPE])) {
+            return;
+        }
+        $segment = trim((string) ($attributes[LeadFieldCanonical::CUSTOMER_SEGMENT] ?? ''));
+        if ($segment === '') {
+            return;
+        }
+        $allowed = array_flip(LeadPicklistService::DEFAULT_ORGANIZATION_TYPES);
+        if (isset($allowed[$segment])) {
+            $attributes[LeadFieldCanonical::ORGANIZATION_TYPE] = $segment;
+        }
     }
 
     public function resolveLeadSource(?string $leadSource, ?string $source): ?string
@@ -85,19 +110,21 @@ class LeadPipelineSyncService
     /** @param  array<string, mixed>  $payload */
     public function enrichApiPayload(array $payload): array
     {
-        $payload['current_stage'] = $this->resolveStageLabel(
-            $payload['current_stage'] ?? null,
-            $payload['status'] ?? null
+        $payload[LeadFieldCanonical::PIPELINE_STAGE] = $this->resolveStageLabel(
+            $payload[LeadFieldCanonical::PIPELINE_STAGE] ?? null,
+            $payload[LeadFieldCanonical::LEGACY_STATUS] ?? null
         );
-        $payload['lead_source'] = $this->resolveLeadSource(
-            $payload['lead_source'] ?? null,
-            $payload['source'] ?? null
+        $resolvedSource = $this->resolveLeadSource(
+            $payload[LeadFieldCanonical::LEAD_SOURCE] ?? null,
+            $payload[LeadFieldCanonical::LEGACY_SOURCE] ?? null
         );
-        if ($payload['lead_source']) {
-            $payload['source'] = $payload['lead_source'];
+        if ($resolvedSource) {
+            $payload[LeadFieldCanonical::LEAD_SOURCE] = $resolvedSource;
         }
 
-        unset($payload['stage_id']);
+        foreach (LeadFieldCanonical::STRIP_FROM_API as $key) {
+            unset($payload[$key]);
+        }
 
         return $payload;
     }
@@ -105,15 +132,42 @@ class LeadPipelineSyncService
     public function enrichLead(Lead $lead): Lead
     {
         $lead->setAttribute(
-            'current_stage',
+            LeadFieldCanonical::PIPELINE_STAGE,
             $this->resolveStageLabel($lead->current_stage, $lead->status)
         );
         $resolvedSource = $this->resolveLeadSource($lead->lead_source, $lead->source);
         if ($resolvedSource) {
-            $lead->setAttribute('lead_source', $resolvedSource);
-            $lead->setAttribute('source', $resolvedSource);
+            $lead->setAttribute(LeadFieldCanonical::LEAD_SOURCE, $resolvedSource);
+            // In-memory mirror for list serialization; API layer strips legacy key from JSON.
+            $lead->setAttribute(LeadFieldCanonical::LEGACY_SOURCE, $resolvedSource);
         }
 
         return $lead;
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function syncStageWritable(array &$data): void
+    {
+        if (!empty($data[LeadFieldCanonical::PIPELINE_STAGE]) && empty($data[LeadFieldCanonical::LEGACY_STATUS])) {
+            $status = self::STAGE_TO_STATUS[Str::lower(trim((string) $data[LeadFieldCanonical::PIPELINE_STAGE]))] ?? null;
+            if ($status) {
+                $data[LeadFieldCanonical::LEGACY_STATUS] = $status;
+            }
+        }
+
+        if (!empty($data[LeadFieldCanonical::LEGACY_STATUS]) && empty($data[LeadFieldCanonical::PIPELINE_STAGE])) {
+            $data[LeadFieldCanonical::PIPELINE_STAGE] = self::STATUS_TO_STAGE[$data[LeadFieldCanonical::LEGACY_STATUS]] ?? null;
+        }
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function syncSourceWritable(array &$data): void
+    {
+        if (!empty($data[LeadFieldCanonical::LEGACY_SOURCE]) && empty($data[LeadFieldCanonical::LEAD_SOURCE])) {
+            $data[LeadFieldCanonical::LEAD_SOURCE] = $data[LeadFieldCanonical::LEGACY_SOURCE];
+        }
+        if (!empty($data[LeadFieldCanonical::LEAD_SOURCE])) {
+            $data[LeadFieldCanonical::LEGACY_SOURCE] = $data[LeadFieldCanonical::LEAD_SOURCE];
+        }
     }
 }

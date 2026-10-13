@@ -57,7 +57,7 @@ class CustomerController extends Controller
         if ($request->has('status')) {
             $request->merge(['status' => CustomerStatus::normalize($request->input('status'))]);
         }
-        foreach (['customer_segment', 'industry', 'geo_location'] as $pick) {
+        foreach (['organization_type', 'customer_segment', 'industry', 'geo_location'] as $pick) {
             if ($request->has($pick) && $request->input($pick) === '') {
                 $request->merge([$pick => null]);
             }
@@ -71,6 +71,7 @@ class CustomerController extends Controller
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:'.CrmConfigLimits::CUSTOMER_ADDRESS_MAX,
             'status' => ['sometimes', 'string', Rule::in(CustomerStatus::CANONICAL)],
+            'organization_type' => ['nullable', 'string', 'max:120', $this->picklists->rule('organization_type')],
             'customer_segment' => ['nullable', 'string', 'max:120', $this->picklists->rule('customer_segment')],
             'industry' => ['nullable', 'string', 'max:120', $this->picklists->rule('industry')],
             'geo_location' => ['nullable', 'string', 'max:120', $this->picklists->rule('geo_location')],
