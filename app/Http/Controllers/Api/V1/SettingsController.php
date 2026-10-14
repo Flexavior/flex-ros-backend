@@ -10,6 +10,7 @@ use App\Models\Lead;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\SystemNotification;
+use App\Support\SsoSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -133,6 +134,19 @@ class SettingsController extends Controller
             $auditEvents[] = 'crm.qualify';
         }
 
+        foreach (['microsoft', 'google'] as $provider) {
+            $flatKey = SsoSetting::settingKey($provider);
+            if (! array_key_exists($flatKey, $body)) {
+                continue;
+            }
+            $enabled = validator(
+                ['v' => $body[$flatKey]],
+                ['v' => 'required|boolean']
+            )->validate()['v'];
+            Setting::put($flatKey, $enabled, 'auth', $request->user()->id);
+            $auditEvents[] = $flatKey;
+        }
+
         if (array_key_exists('crm.inbox_enabled_roles', $body)) {
             $roles = validator(
                 ['r' => $body['crm.inbox_enabled_roles']],
@@ -173,6 +187,8 @@ class SettingsController extends Controller
             'crm.qualify' => Lead::qualifyConfig(),
             'crm.inbox_enabled_roles' => InboxAccess::enabledRoleCodes(),
             'crm.inbox_role_catalog' => InboxAccess::roleCatalog(),
+            SsoSetting::settingKey('microsoft') => SsoSetting::isProviderEnabled('microsoft'),
+            SsoSetting::settingKey('google') => SsoSetting::isProviderEnabled('google'),
         ];
     }
 

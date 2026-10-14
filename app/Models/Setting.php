@@ -11,7 +11,7 @@ class Setting extends Model
 
     protected function casts(): array
     {
-        return ['value' => 'array'];
+        return ['value' => 'json'];
     }
 
     public function updatedBy() { return $this->belongsTo(User::class, 'updated_by'); }
@@ -19,7 +19,12 @@ class Setting extends Model
     /** Get a setting value (array/scalar) with cache. */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $all = Cache::rememberForever('settings.all', fn () => self::query()->pluck('value', 'key')->all());
+        $all = Cache::rememberForever('settings.all', function () {
+            return self::query()
+                ->get()
+                ->mapWithKeys(fn (self $setting) => [$setting->key => $setting->value])
+                ->all();
+        });
 
         return $all[$key] ?? $default;
     }

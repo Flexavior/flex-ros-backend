@@ -3,9 +3,9 @@
 namespace App\Domain\Auth;
 
 use App\Models\Role;
-use App\Models\Setting;
 use App\Models\User;
 use App\Support\AuthUserPayload;
+use App\Support\SsoSetting;
 use App\Models\UserIdentity;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -151,13 +151,7 @@ class SsoService
 
     private function isProviderEnabled(string $provider): bool
     {
-        $settingKey = "auth.sso.{$provider}_enabled";
-        $settingValue = Setting::get($settingKey, null);
-        if ($settingValue !== null) {
-            return filter_var($settingValue, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
-        }
-
-        return (bool) config("services.sso.{$provider}.enabled", false);
+        return SsoSetting::isProviderEnabled($provider);
     }
 
     private function guardEnabled(string $provider): void

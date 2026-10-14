@@ -27,7 +27,9 @@ class SettingsGeneralInboxApiTest extends TestCase
                 'crm.inbox_enabled_roles' => [Role::SENIOR_MANAGEMENT, Role::CUSTOMER_SERVICE],
             ])
             ->assertOk()
-            ->assertJsonPath('crm.inbox_enabled_roles', [Role::SENIOR_MANAGEMENT, Role::CUSTOMER_SERVICE]);
+            ->assertJson([
+                'crm.inbox_enabled_roles' => [Role::SENIOR_MANAGEMENT, Role::CUSTOMER_SERVICE],
+            ]);
 
         $this->assertEquals(
             [Role::SENIOR_MANAGEMENT, Role::CUSTOMER_SERVICE],
