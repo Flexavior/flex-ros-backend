@@ -98,10 +98,10 @@ class User extends Authenticatable
         return $this->hasAnyRole(Role::APPROVERS);
     }
 
-    /** May own/answer omnichannel conversations. */
+    /** May own/answer omnichannel conversations (role + settings-backed enable list). */
     public function isInboxAgent(): bool
     {
-        return $this->hasAnyRole(Role::INBOX_AGENTS);
+        return \App\Domain\Inbox\InboxAccess::userMayAccess($this);
     }
 
     /** May assign/reassign conversation flow to other users. */

@@ -6,6 +6,7 @@ use App\Events\InboxUpdated;
 use App\Models\Conversation;
 use App\Models\ConversationEvent;
 use App\Models\ConversationMessage;
+use App\Domain\Inbox\InboxAccess;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
@@ -48,6 +49,17 @@ class InboxApiTest extends TestCase
         $marketing = User::where('email', 'marketing@mss.test')->first();
 
         $this->actingAs($marketing)
+            ->getJson('/api/v1/inbox/conversations')
+            ->assertStatus(403);
+    }
+
+    public function test_cs_denied_when_role_disabled_in_settings(): void
+    {
+        $this->seedRoles();
+        Setting::put(InboxAccess::SETTING_KEY, [Role::CEO]);
+        $cs = User::where('email', 'cs@mss.test')->first();
+
+        $this->actingAs($cs)
             ->getJson('/api/v1/inbox/conversations')
             ->assertStatus(403);
     }

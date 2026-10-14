@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Crm\CrmConfigLimits;
 use App\Domain\Crm\LeadPicklistService;
+use App\Domain\Inbox\InboxAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Lead;
 use App\Models\Role;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class SettingsController extends Controller
@@ -72,6 +74,8 @@ class SettingsController extends Controller
         return response()->json([
             'crm.stale_task_days' => Setting::get('crm.stale_task_days', 5),
             'crm.qualify' => $qualify,
+            'crm.inbox_enabled_roles' => InboxAccess::enabledRoleCodes(),
+            'crm.inbox_role_catalog' => InboxAccess::roleCatalog(),
         ]);
     }
 
@@ -81,6 +85,8 @@ class SettingsController extends Controller
 
         $data = $request->validate([
             'crm.stale_task_days' => 'sometimes|integer|min:1|max:90',
+            'crm.inbox_enabled_roles' => 'sometimes|array',
+            'crm.inbox_enabled_roles.*' => ['string', Rule::in(Role::INBOX_AGENTS)],
         ]);
 
         $requestData = $request->all();

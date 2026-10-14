@@ -4,13 +4,13 @@
                 "TIK141026-019-be-funnel-followup-products",
                 "TIK141026-020-fe-action-feedback-inputs"
             ],
-    "synced_at_utc":  "2026-10-13T11:53:13.0015658Z",
+    "synced_at_utc":  "2026-10-14T02:45:32.4716892Z",
     "sync_mode":  "incremental",
     "source_root":  "C:\\laragon\\www\\mss-crm",
     "mirrors":  [
                     "P:\\ghUpload\\flex-ros-backend",
                     "P:\\ghUpload\\flex-ros-frontend"
                 ],
-    "release_note":  "Funnel by stage, follow-up picklists, product units, save feedback (auto from INDEX 2026-10-13)",
+    "release_note":  "Funnel by stage, follow-up picklists, product units, save feedback (auto from INDEX 2026-10-14)",
     "last_trigger_destination":  "P:\\ghUpload\\flex-ros-backend"
 }
