@@ -268,3 +268,8 @@ POST   /api/v1/broadcasting/auth     (Sanctum — for Echo)
 ```
 
 Full list: [`routes/api.php`](routes/api.php).
+
+### License  
+This project is licensed under the MIT License. 
+
+"# Flexavior-ROS-BE"

@@ -19,6 +19,7 @@ final class AuthUserPayload
             'team' => $user->team?->only(['id', 'name']),
             'is_active' => $user->is_active,
             'can_access_inbox' => InboxAccess::userMayAccess($user),
+            'system_notifications' => SystemNotificationCatalog::activeSummaries(),
         ];
     }
 }

@@ -1,16 +1,18 @@
 ﻿{
-    "cr":  "CR141026-Lead-UX-Funnel-FollowUp-Products",
+    "cr":  "CR141026-Docs-Products-Settings-UI",
     "tik":  [
-                "TIK141026-019-be-funnel-followup-products",
-                "TIK141026-020-fe-action-feedback-inputs"
+                "TIK141026-021-fe-docs-products-settings-ui",
+                "TIK141026-022-be-products-marketing-notifications",
+                "TIK141026-023-fe-marketing-welcome-notifications",
+                "TIK141026-024-workspace-ghupload-docs-products-ui"
             ],
-    "synced_at_utc":  "2026-10-14T03:20:21.7386464Z",
+    "synced_at_utc":  "2026-10-14T05:53:41.2934996Z",
     "sync_mode":  "incremental",
     "source_root":  "C:\\laragon\\www\\mss-crm",
     "mirrors":  [
                     "P:\\ghUpload\\flex-ros-backend",
                     "P:\\ghUpload\\flex-ros-frontend"
                 ],
-    "release_note":  "Funnel by stage, follow-up picklists, product units, save feedback (auto from INDEX 2026-10-14)",
-    "last_trigger_destination":  "P:\\ghUpload\\flex-ros-backend"
+    "release_note":  "Docs/Products/Settings UI, marketing channels, login welcome, system notifications (auto from INDEX 2026-10-14)",
+    "last_trigger_destination":  "P:\\ghUpload\\flex-ros-frontend"
 }

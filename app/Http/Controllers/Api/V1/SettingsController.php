@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Lead;
 use App\Models\Role;
 use App\Models\Setting;
+use App\Models\SystemNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -262,6 +263,63 @@ class SettingsController extends Controller
                 ],
             ]
         ));
+    }
+
+    /** GET /api/v1/settings/system-notifications — admin list (incl. inactive). */
+    public function getSystemNotifications(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        $rows = SystemNotification::query()
+            ->with('createdBy:id,name')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json($rows);
+    }
+
+    /** POST /api/v1/settings/system-notifications — broadcast to all users. */
+    public function storeSystemNotification(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        $data = $request->validate([
+            'body' => 'required|string|max:2000',
+            'effective_from' => 'nullable|date',
+            'effective_until' => 'nullable|date|after_or_equal:effective_from',
+        ]);
+
+        $row = SystemNotification::create([
+            'body' => $data['body'],
+            'effective_from' => $data['effective_from'] ?? now(),
+            'effective_until' => $data['effective_until'] ?? null,
+            'is_active' => true,
+            'created_by' => $request->user()->id,
+        ]);
+
+        Log::info('system_notification.created', [
+            'id' => $row->id,
+            'admin_id' => $request->user()->id,
+        ]);
+
+        return response()->json($row->load('createdBy:id,name'), 201);
+    }
+
+    /** PATCH /api/v1/settings/system-notifications/{systemNotification} — deactivate. */
+    public function updateSystemNotification(Request $request, SystemNotification $systemNotification)
+    {
+        $this->authorizeAdmin($request);
+
+        $data = $request->validate([
+            'is_active' => 'sometimes|boolean',
+            'body' => 'sometimes|string|max:2000',
+            'effective_until' => 'nullable|date',
+        ]);
+
+        $systemNotification->update($data);
+
+        return response()->json($systemNotification->fresh());
     }
 
     protected function authorizeAdmin(Request $request): void

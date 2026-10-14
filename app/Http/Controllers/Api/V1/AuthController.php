@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Auth\SsoService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Support\AuthUserPayload;
+use App\Support\LoginSessionPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -82,13 +82,15 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => $this->present($user),
+            'user' => LoginSessionPresenter::userPayload($user, true),
         ]);
     }
 
     public function me(Request $request)
     {
-        return response()->json($this->present($request->user()->load('role', 'supervisor', 'team')));
+        return response()->json(
+            LoginSessionPresenter::userPayload($request->user(), false)
+        );
     }
 
     public function logout(Request $request)
@@ -98,8 +100,4 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out.']);
     }
 
-    protected function present(User $user): array
-    {
-        return AuthUserPayload::from($user);
-    }
 }
