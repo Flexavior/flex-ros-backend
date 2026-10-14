@@ -10,6 +10,7 @@ use App\Models\Lead;
 use App\Models\Role;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -63,7 +64,20 @@ class SettingsController extends Controller
             $updated[] = $stageCode;
         }
 
-        return response()->json(['updated' => $updated]);
+        if ($updated !== []) {
+            Log::info('settings.checklists_updated', [
+                'stages' => $updated,
+                'admin_id' => $request->user()->id,
+            ]);
+        }
+
+        return response()->json([
+            'updated' => $updated,
+            'audit' => [
+                'events' => array_map(static fn ($c) => "crm.checklists.{$c}", $updated),
+                'logged_at' => now()->toIso8601String(),
+            ],
+        ]);
     }
 
     /** GET/PUT crm.stale_task_days and other thresholds. */
@@ -71,60 +85,94 @@ class SettingsController extends Controller
     {
         $qualify = Lead::qualifyConfig();
 
-        return response()->json([
-            'crm.stale_task_days' => Setting::get('crm.stale_task_days', 5),
-            'crm.qualify' => $qualify,
-            'crm.inbox_enabled_roles' => InboxAccess::enabledRoleCodes(),
-            'crm.inbox_role_catalog' => InboxAccess::roleCatalog(),
-        ]);
+        return response()->json($this->generalSettingsPayload());
     }
 
     public function updateGeneral(Request $request)
     {
         $this->authorizeAdmin($request);
 
-        $data = $request->validate([
-            'crm.stale_task_days' => 'sometimes|integer|min:1|max:90',
-            'crm.inbox_enabled_roles' => 'sometimes|array',
-            'crm.inbox_enabled_roles.*' => ['string', Rule::in(Role::INBOX_AGENTS)],
-        ]);
+        $body = $request->all();
+        $auditEvents = [];
 
-        $requestData = $request->all();
-        if (array_key_exists('crm.qualify', $requestData)) {
-            if (!is_array($requestData['crm.qualify'])) {
+        if (array_key_exists('crm.stale_task_days', $body)) {
+            $days = validator(
+                ['v' => $body['crm.stale_task_days']],
+                ['v' => 'required|integer|min:1|max:90']
+            )->validate()['v'];
+            Setting::put('crm.stale_task_days', $days, 'crm', $request->user()->id);
+            $auditEvents[] = 'crm.stale_task_days';
+        }
+
+        if (array_key_exists('crm.qualify', $body)) {
+            if (!is_array($body['crm.qualify'])) {
                 throw ValidationException::withMessages([
                     'crm.qualify' => ['The crm.qualify field must be an array.'],
                 ]);
             }
 
-            $qualify = validator($requestData['crm.qualify'], [
+            $qualify = validator($body['crm.qualify'], [
                 'max_idle_touches' => 'sometimes|integer|min:1|max:50',
                 'progress_outcomes' => 'sometimes|array|min:1|max:20',
                 'progress_outcomes.*' => 'string|max:'.CrmConfigLimits::PICKLIST_OPTION_MAX_LENGTH,
             ])->validate();
 
-            $data['crm.qualify'] = $qualify;
-        }
-
-        if (isset($data['crm.qualify']['progress_outcomes'])) {
-            $allowed = $this->leadPicklists->options('activity_outcome');
-            foreach ($data['crm.qualify']['progress_outcomes'] as $outcome) {
-                if (!in_array($outcome, $allowed, true)) {
-                    throw ValidationException::withMessages([
-                        'crm.qualify.progress_outcomes' => ['Each progress outcome must match activity_outcome picklist options.'],
-                    ]);
+            if (isset($qualify['progress_outcomes'])) {
+                $allowed = $this->leadPicklists->options('activity_outcome');
+                foreach ($qualify['progress_outcomes'] as $outcome) {
+                    if (!in_array($outcome, $allowed, true)) {
+                        throw ValidationException::withMessages([
+                            'crm.qualify.progress_outcomes' => ['Each progress outcome must match activity_outcome picklist options.'],
+                        ]);
+                    }
                 }
             }
+
+            Setting::put('crm.qualify', array_replace(Lead::qualifyDefaults(), $qualify), 'crm', $request->user()->id);
+            $auditEvents[] = 'crm.qualify';
         }
 
-        foreach ($data as $key => $value) {
-            if ($key === 'crm.qualify') {
-                $value = array_replace(Lead::qualifyDefaults(), $value);
-            }
-            Setting::put($key, $value);
+        if (array_key_exists('crm.inbox_enabled_roles', $body)) {
+            $roles = validator(
+                ['r' => $body['crm.inbox_enabled_roles']],
+                [
+                    'r' => 'present|array',
+                    'r.*' => ['string', Rule::in(Role::INBOX_AGENTS)],
+                ]
+            )->validate()['r'];
+            $roles = array_values(array_intersect($roles, Role::INBOX_AGENTS));
+            Setting::put(InboxAccess::SETTING_KEY, $roles, 'crm', $request->user()->id);
+            Log::info('settings.inbox_access_updated', [
+                'roles' => $roles,
+                'admin_id' => $request->user()->id,
+            ]);
+            $auditEvents[] = InboxAccess::SETTING_KEY;
         }
 
-        return $this->getGeneral();
+        if ($auditEvents !== []) {
+            Log::info('settings.general_updated', [
+                'keys' => $auditEvents,
+                'admin_id' => $request->user()->id,
+            ]);
+        }
+
+        return response()->json(array_merge($this->generalSettingsPayload(), [
+            'audit' => [
+                'events' => $auditEvents,
+                'logged_at' => now()->toIso8601String(),
+            ],
+        ]));
+    }
+
+    /** @return array<string, mixed> */
+    protected function generalSettingsPayload(): array
+    {
+        return [
+            'crm.stale_task_days' => Setting::get('crm.stale_task_days', 5),
+            'crm.qualify' => Lead::qualifyConfig(),
+            'crm.inbox_enabled_roles' => InboxAccess::enabledRoleCodes(),
+            'crm.inbox_role_catalog' => InboxAccess::roleCatalog(),
+        ];
     }
 
     public function roles()
@@ -162,10 +210,19 @@ class SettingsController extends Controller
 
         $restored = $this->leadPicklists->restoreKeyToDefaults($key, $request->user()->id);
 
+        Log::info('settings.lead_picklist_restored', [
+            'key' => $key,
+            'admin_id' => $request->user()->id,
+        ]);
+
         return response()->json([
             'key' => $key,
             'options' => $restored,
             'picklists' => $this->leadPicklists->all(),
+            'audit' => [
+                'events' => ["crm.lead_picklists.{$key}.restore"],
+                'logged_at' => now()->toIso8601String(),
+            ],
         ]);
     }
 
@@ -188,7 +245,23 @@ class SettingsController extends Controller
         }
         $data = $request->validate($rules);
 
-        return response()->json($this->leadPicklists->put($data, $request->user()->id));
+        $keysUpdated = array_keys($data);
+        if ($keysUpdated !== []) {
+            Log::info('settings.lead_picklists_updated', [
+                'keys' => $keysUpdated,
+                'admin_id' => $request->user()->id,
+            ]);
+        }
+
+        return response()->json(array_merge(
+            $this->leadPicklists->put($data, $request->user()->id),
+            [
+                'audit' => [
+                    'events' => array_map(static fn ($k) => "crm.lead_picklists.{$k}", $keysUpdated),
+                    'logged_at' => now()->toIso8601String(),
+                ],
+            ]
+        ));
     }
 
     protected function authorizeAdmin(Request $request): void
