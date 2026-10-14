@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Role;
-use App\Models\Setting;
 use App\Models\User;
+use App\Support\SsoSetting;
 use Illuminate\Http\Request;
 
 class AdminConsoleController extends Controller
@@ -25,8 +25,8 @@ class AdminConsoleController extends Controller
                     ->count(),
             ],
             'auth' => [
-                'sso_microsoft_enabled' => (bool) Setting::get('auth.sso.microsoft_enabled', false),
-                'sso_google_enabled' => (bool) Setting::get('auth.sso.google_enabled', false),
+                'sso_microsoft_enabled' => SsoSetting::isProviderEnabled('microsoft'),
+                'sso_google_enabled' => SsoSetting::isProviderEnabled('google'),
             ],
             'realtime' => [
                 'broadcast_driver' => config('broadcasting.default'),
