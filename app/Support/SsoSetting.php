@@ -33,9 +33,10 @@ final class SsoSetting
     public static function isProviderEnabled(string $provider): bool
     {
         $key = self::settingKey($provider);
-        $settingValue = Setting::get($key, null);
-        if ($settingValue !== null) {
-            return self::coerceBool($settingValue);
+        // Read from DB (not settings.all cache): manual SQL edits and stale cache must not hide login buttons.
+        $setting = Setting::query()->where('key', $key)->first();
+        if ($setting !== null) {
+            return self::coerceBool($setting->value);
         }
 
         return (bool) config('services.sso.'.strtolower(trim($provider)).'.enabled', false);

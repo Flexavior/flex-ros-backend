@@ -41,6 +41,10 @@ class SettingsGeneralSsoApiTest extends TestCase
 
         Cache::put('settings.all', ['stale' => true], 3600);
 
+        $this->getJson('/api/v1/auth/sso/config')
+            ->assertOk()
+            ->assertJsonPath('microsoft', true);
+
         $this->actingAs($admin)
             ->putJson('/api/v1/settings/general', [
                 SsoSetting::settingKey('microsoft') => false,
