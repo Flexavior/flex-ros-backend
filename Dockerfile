@@ -20,3 +20,4 @@ CMD php artisan package:discover --ansi \
     && php artisan migrate --force \
     #&& php artisan db:seed --class=ProductionCatalogSeeder --force \
     && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+
