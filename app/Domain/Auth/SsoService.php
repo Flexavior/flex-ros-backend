@@ -3,6 +3,7 @@
 namespace App\Domain\Auth;
 
 use App\Models\Role;
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\AuthUserPayload;
 use App\Support\SsoSetting;
@@ -134,8 +135,11 @@ class SsoService
     private function guardAllowedDomain(string $email): void
     {
         $setting = Setting::get('auth.sso.allowed_email_domains', config('services.sso.allowed_email_domains', ''));
-        $domains = collect(explode(',', (string) $setting))
-            ->map(fn ($d) => strtolower(trim($d)))
+        $domains = is_array($setting)
+            ? collect($setting)
+            : collect(explode(',', (string) $setting));
+        $domains = $domains
+            ->map(fn ($d) => strtolower(trim((string) $d)))
             ->filter()
             ->values();
 
