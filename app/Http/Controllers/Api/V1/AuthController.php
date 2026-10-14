@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Auth\SsoService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AuthUserPayload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -99,14 +100,6 @@ class AuthController extends Controller
 
     protected function present(User $user): array
     {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role?->only(['code', 'name', 'level']),
-            'supervisor' => $user->supervisor?->only(['id', 'name']),
-            'team' => $user->team?->only(['id', 'name']),
-            'is_active' => $user->is_active,
-        ];
+        return AuthUserPayload::from($user);
     }
 }

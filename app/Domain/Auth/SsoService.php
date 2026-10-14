@@ -5,6 +5,7 @@ namespace App\Domain\Auth;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
+use App\Support\AuthUserPayload;
 use App\Models\UserIdentity;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -76,15 +77,7 @@ class SsoService
 
         return [
             'token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role?->only(['code', 'name', 'level']),
-                'supervisor' => $user->supervisor?->only(['id', 'name']),
-                'team' => $user->team?->only(['id', 'name']),
-                'is_active' => $user->is_active,
-            ],
+            'user' => AuthUserPayload::from($user),
         ];
     }
 
