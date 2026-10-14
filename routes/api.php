@@ -53,6 +53,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('stages', [SettingsController::class, 'stages']);
     Route::get('settings/general', [SettingsController::class, 'getGeneral']);
     Route::put('settings/general', [SettingsController::class, 'updateGeneral']);
+    Route::get('settings/system-notifications', [SettingsController::class, 'getSystemNotifications']);
+    Route::post('settings/system-notifications', [SettingsController::class, 'storeSystemNotification']);
+    Route::patch('settings/system-notifications/{systemNotification}', [SettingsController::class, 'updateSystemNotification']);
     Route::get('settings/checklists', [SettingsController::class, 'getChecklists']);
     Route::put('settings/checklists', [SettingsController::class, 'updateChecklists']);
     Route::get('settings/lead-picklists/defaults', [SettingsController::class, 'getLeadPicklistDefaults']);

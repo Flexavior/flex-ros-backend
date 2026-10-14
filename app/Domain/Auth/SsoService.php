@@ -77,7 +77,7 @@ class SsoService
 
         return [
             'token' => $token,
-            'user' => AuthUserPayload::from($user),
+            'user' => \App\Support\LoginSessionPresenter::userPayload($user, true),
         ];
     }
 

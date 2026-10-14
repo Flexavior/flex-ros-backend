@@ -2,9 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\PipelineStage;
 use App\Models\Role;
-use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -37,8 +35,12 @@ class RoleAndUserSeeder extends Seeder
         }
 
         $this->seedUsers($roleIds);
-        $this->seedStagesAndSettings();
-        $this->seedChecklistsAndIntegrations();
+
+        $this->call([
+            CrmStagesAndSettingsSeeder::class,
+            CrmChecklistsAndIntegrationsSeeder::class,
+            MarketingChannelSeeder::class,
+        ]);
     }
 
     protected function seedUsers(array $roleIds): void
@@ -79,91 +81,5 @@ class RoleAndUserSeeder extends Seeder
         // Keep the team_user pivot in sync with users.team_id (unit membership)
         $teamMemberIds = User::where('team_id', $team->id)->pluck('id')->all();
         $team->members()->sync($teamMemberIds);
-    }
-
-    protected function seedStagesAndSettings(): void
-    {
-        // ---- Pipeline stages (drives dynamic checklists) ----
-        $stages = [
-            ['code' => 'lead_capture', 'name' => 'Lead Capture', 'sort_order' => 1],
-            ['code' => 'qualification', 'name' => 'Qualification & Follow-up', 'sort_order' => 2],
-            ['code' => 'appointment', 'name' => 'Appointment & Proposal', 'sort_order' => 3],
-            ['code' => 'onboarding', 'name' => 'Customer Onboarding', 'sort_order' => 4],
-            ['code' => 'contract_sign_off', 'name' => 'NDA / MoU / Contract Sign-off', 'sort_order' => 5],
-            ['code' => 'launch', 'name' => 'Launch', 'sort_order' => 6],
-        ];
-
-        foreach ($stages as $s) {
-            PipelineStage::updateOrCreate(['code' => $s['code']], $s);
-        }
-
-        // ---- Default system settings (System Settings module) ----
-        Setting::put('crm.stale_task_days', 5, 'dashboard');
-        Setting::put('crm.client_id_prefix', 'CUS', 'crm');
-        Setting::put('auth.sso.microsoft_enabled', false, 'auth');
-        Setting::put('auth.sso.google_enabled', false, 'auth');
-        Setting::put('auth.sso.allowed_email_domains', [], 'auth');
-        Setting::put(
-            \App\Domain\Crm\LeadPicklistService::SETTINGS_KEY,
-            (new \App\Domain\Crm\LeadPicklistService)->defaults(),
-            'crm'
-        );
-    }
-
-    protected function seedChecklistsAndIntegrations(): void
-    {
-        // Default dynamic checklists — fully editable via System Settings (add/remove)
-        Setting::put('crm.checklists.onboarding', [
-            ['title' => 'Client document provisioning collected', 'is_required' => true],
-            ['title' => 'Client logo received', 'is_required' => true],
-            ['title' => 'Bank account details verified', 'is_required' => true],
-        ], 'checklists');
-
-        Setting::put('crm.checklists.contract_sign_off', [
-            ['title' => 'NDA signed', 'is_required' => true],
-            ['title' => 'MoU signed', 'is_required' => false],
-            ['title' => 'Contract signed by both parties', 'is_required' => true],
-            ['title' => 'Advance payment received', 'is_required' => false],
-        ], 'checklists');
-
-        Setting::put('crm.checklists.launch', [
-            ['title' => 'All external dependencies completed', 'is_required' => true],
-            ['title' => 'Client sign-off on launch date', 'is_required' => true],
-        ], 'checklists');
-
-        // ---- Channel integrations (Viber/Telegram/Discord/Teams — Phase 2) ----
-        foreach ([
-            ['provider' => 'viber', 'display_name' => 'Viber Business'],
-            ['provider' => 'telegram', 'display_name' => 'Telegram Bot'],
-            ['provider' => 'discord', 'display_name' => 'Discord'],
-            ['provider' => 'teams', 'display_name' => 'Microsoft Teams'],
-        ] as $ch) {
-            \App\Models\ChannelIntegration::updateOrCreate(
-                ['provider' => $ch['provider']],
-                $ch + ['status' => 'disconnected']
-            );
-        }
-
-        // ---- Module registry (Finance / PM / HR extendability) ----
-        foreach ([
-            ['code' => 'finance', 'name' => 'Finance', 'base_path' => '/api/v1/finance'],
-            ['code' => 'project_management', 'name' => 'Project Management', 'base_path' => '/api/v1/pm'],
-            ['code' => 'hr', 'name' => 'HR', 'base_path' => '/api/v1/hr'],
-        ] as $m) {
-            \App\Models\ModuleRegistry::updateOrCreate(['code' => $m['code']], $m + ['status' => 'available']);
-        }
-
-        // ---- Digital marketing channels (planning / posting schedule register) ----
-        foreach ([
-            ['name' => 'Facebook', 'code' => 'facebook', 'type' => 'social'],
-            ['name' => 'LinkedIn', 'code' => 'linkedin', 'type' => 'social'],
-            ['name' => 'Telegram', 'code' => 'telegram', 'type' => 'messaging'],
-            ['name' => 'Viber', 'code' => 'viber', 'type' => 'messaging'],
-            ['name' => 'Google Search', 'code' => 'google_search', 'type' => 'search'],
-            ['name' => 'Website / SEO', 'code' => 'website', 'type' => 'other'],
-            ['name' => 'Email Newsletter', 'code' => 'email', 'type' => 'email'],
-        ] as $ch) {
-            \App\Models\MarketingChannel::updateOrCreate(['code' => $ch['code']], $ch + ['is_active' => true]);
-        }
     }
 }

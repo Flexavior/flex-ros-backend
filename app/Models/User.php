@@ -20,6 +20,8 @@ class User extends Authenticatable
         'supervisor_id',
         'team_id',
         'is_active',
+        'first_login_at',
+        'last_login_at',
     ];
 
     protected $hidden = [
@@ -32,6 +34,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'is_active' => 'boolean',
+            'first_login_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

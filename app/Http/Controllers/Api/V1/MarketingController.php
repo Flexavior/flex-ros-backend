@@ -14,7 +14,12 @@ class MarketingController extends Controller
     // ---- Channels ----
     public function channels()
     {
-        return response()->json(MarketingChannel::orderBy('name')->get());
+        return response()->json(
+            MarketingChannel::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
+        );
     }
 
     public function storeChannel(Request $request)
