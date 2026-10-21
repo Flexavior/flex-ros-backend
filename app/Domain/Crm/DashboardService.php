@@ -60,6 +60,7 @@ class DashboardService
             ->where('status_updated_at', '<=', $now->copy()->subDays($staleDays));
         $staleCount = (clone $staleBase)->count();
         $staleLeads = (clone $staleBase)
+            ->with('owner:id,name')
             ->orderBy('status_updated_at')
             ->limit(10)
             ->get(['id', 'name', 'company', 'status', 'status_updated_at', 'owner_id']);
@@ -92,13 +93,16 @@ class DashboardService
             ->having('idle_touch_count', '>=', $maxIdle);
         $qualifyCount = (clone $qualifyBase)->count();
         $qualifySample = (clone $qualifyBase)
+            ->with('owner:id,name')
             ->orderByDesc('idle_touch_count')
             ->limit(8)
-            ->get(['id', 'name', 'company'])
+            ->get(['id', 'name', 'company', 'owner_id'])
             ->map(fn (Lead $l) => [
                 'id' => $l->id,
                 'name' => $l->name,
                 'company' => $l->company,
+                'owner_id' => $l->owner_id,
+                'owner_name' => $l->owner?->name,
                 'idle_touch_count' => $l->idle_touch_count,
             ])->all();
 
@@ -166,6 +170,7 @@ class DashboardService
                 'yoy' => $this->comparison($currentPeriod, $yearPeriod, $previousYear),
             ],
             'action_items' => $actionItems,
+            'action_items_count' => count($actionItems),
             'rep_activity_this_week' => $repActivity,
             'mql_sql' => [
                 'mql' => $mqlCount,
@@ -305,7 +310,7 @@ class DashboardService
     {
         $reps = User::query()
             ->where('is_active', true)
-            ->whereHas('role', fn ($query) => $query->whereIn('code', Role::SALES_CRM))
+            ->whereHas('role', fn ($query) => $query->whereIn('code', Role::DASHBOARD_REP_ACTIVITY))
             ->when(! $user->isOrgLevel(), fn ($query) => $query->whereIn('id', $this->visibleUserIds($user)))
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -377,6 +382,8 @@ class DashboardService
                     'title' => "{$lead->name} has not moved",
                     'entity_type' => 'lead',
                     'entity_id' => $lead->id,
+                    'entity_label' => $lead->name,
+                    'assignee_name' => $lead->owner?->name ?? 'Unassigned',
                     'route' => "/leads/{$lead->id}",
                     'priority' => 'high',
                     'meta' => ['days_no_change' => (int) round(now()->diffInDays($lead->status_updated_at))],
@@ -390,13 +397,15 @@ class DashboardService
                     'title' => "{$lead['name']} needs qualification progress",
                     'entity_type' => 'lead',
                     'entity_id' => $lead['id'],
+                    'entity_label' => $lead['name'],
+                    'assignee_name' => $lead['owner_name'] ?? 'Unassigned',
                     'route' => "/leads/{$lead['id']}",
                     'priority' => 'medium',
                     'meta' => ['idle_touch_count' => $lead['idle_touch_count']],
                 ];
             }
 
-            foreach ((clone $pendingAgreementBase)->with('customer:id,name,company')->oldest()->limit(5)->get() as $agreement) {
+            foreach ((clone $pendingAgreementBase)->with('customer:id,name,company,owner_id', 'customer.owner:id,name')->oldest()->limit(5)->get() as $agreement) {
                 if (! $agreement->customer) {
                     continue;
                 }
@@ -406,19 +415,24 @@ class DashboardService
                     'title' => "{$agreement->title} needs follow-up",
                     'entity_type' => 'customer',
                     'entity_id' => $agreement->customer_id,
+                    'entity_label' => $agreement->customer->name,
+                    'assignee_name' => $agreement->customer->owner?->name ?? 'Unassigned',
                     'route' => "/customers/{$agreement->customer_id}",
                     'priority' => 'medium',
                     'meta' => ['status' => $agreement->status],
                 ];
             }
 
-            foreach ((clone $appointmentBase)->with('lead:id,name,company')->orderBy('scheduled_at')->limit(5)->get() as $appointment) {
+            foreach ((clone $appointmentBase)->with(['lead:id,name,company,owner_id', 'lead.owner:id,name', 'user:id,name'])->orderBy('scheduled_at')->limit(5)->get() as $appointment) {
+                $assignee = $appointment->user?->name ?? $appointment->lead?->owner?->name ?? 'Unassigned';
                 $items[] = [
                     'id' => "appointment-{$appointment->id}",
                     'kind' => 'upcoming_appointment',
                     'title' => $appointment->title,
                     'entity_type' => 'lead',
                     'entity_id' => $appointment->lead_id,
+                    'entity_label' => $appointment->lead?->name ?? $appointment->title,
+                    'assignee_name' => $assignee,
                     'route' => "/leads/{$appointment->lead_id}",
                     'priority' => 'normal',
                     'meta' => ['scheduled_at' => $appointment->scheduled_at?->toIso8601String()],
@@ -428,15 +442,18 @@ class DashboardService
 
         if (in_array('marketing', $sections, true)) {
             $campaignQuery = MarketingCampaign::query()
+                ->with('owner:id,name')
                 ->where('approval_status', 'pending')
                 ->when(! $user->isOrgLevel() && ! $user->canApprove(), fn ($query) => $query->where('owner_id', $user->id));
-            foreach ($campaignQuery->oldest()->limit(5)->get(['id', 'name']) as $campaign) {
+            foreach ($campaignQuery->oldest()->limit(5)->get(['id', 'name', 'owner_id']) as $campaign) {
                 $items[] = [
                     'id' => "campaign-{$campaign->id}",
                     'kind' => 'campaign_approval',
                     'title' => "{$campaign->name} is pending approval",
                     'entity_type' => 'campaign',
                     'entity_id' => $campaign->id,
+                    'entity_label' => $campaign->name,
+                    'assignee_name' => $campaign->owner?->name ?? 'Unassigned',
                     'route' => '/marketing',
                     'priority' => 'medium',
                     'meta' => [],
