@@ -16,8 +16,9 @@ class ProductServiceController extends Controller
             $query->where('type', $type);
         }
 
-        if ($search = trim((string) $request->query('search', ''))) {
-            $tokens = array_slice(array_filter(preg_split('/\s+/u', $search) ?: []), 0, 4);
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '' && mb_strlen($search) >= 3) {
+            $tokens = array_slice(array_filter(preg_split('/\s+/u', $search) ?: []), 0, 8);
             foreach ($tokens as $token) {
                 $like = '%'.addcslashes($token, '%_\\').'%';
                 $query->where('name', 'like', $like);

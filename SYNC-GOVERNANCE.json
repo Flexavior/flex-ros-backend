@@ -1,18 +1,17 @@
 ﻿{
-    "cr":  "CR141026-Docs-Products-Settings-UI",
+    "cr":  "CR211026-Dynamic-Dashboard-Actions-Metrics",
     "tik":  [
-                "TIK141026-021-fe-docs-products-settings-ui",
-                "TIK141026-022-be-products-marketing-notifications",
-                "TIK141026-023-fe-marketing-welcome-notifications",
-                "TIK141026-024-workspace-ghupload-docs-products-ui"
+                "TIK211026-025-be-dynamic-dashboard",
+                "TIK211026-026-fe-dynamic-dashboard",
+                "TIK211026-027-workspace-dynamic-dashboard-release"
             ],
-    "synced_at_utc":  "2026-10-14T16:58:50.9285360Z",
+    "synced_at_utc":  "2026-10-21T09:53:26.3446759Z",
     "sync_mode":  "incremental",
     "source_root":  "C:\\laragon\\www\\mss-crm",
     "mirrors":  [
                     "P:\\ghUpload\\flex-ros-backend",
                     "P:\\ghUpload\\flex-ros-frontend"
                 ],
-    "release_note":  "Docs/Products/Settings UI, marketing channels, login welcome, system notifications (auto from INDEX 2026-10-14)",
+    "release_note":  "Persona-aware actionable dashboard, live comparisons, rep aggregates, conversion and revenue (auto from INDEX 2026-10-21)",
     "last_trigger_destination":  "P:\\ghUpload\\flex-ros-frontend"
 }

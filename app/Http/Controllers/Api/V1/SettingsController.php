@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Crm\CrmConfigLimits;
+use App\Domain\Crm\DashboardConfig;
 use App\Domain\Crm\LeadPicklistService;
 use App\Domain\Inbox\InboxAccess;
 use App\Http\Controllers\Controller;
@@ -134,6 +135,29 @@ class SettingsController extends Controller
             $auditEvents[] = 'crm.qualify';
         }
 
+        $dashboardStageKeys = [
+            DashboardConfig::MQL_STAGES_KEY,
+            DashboardConfig::SQL_STAGES_KEY,
+            DashboardConfig::PIPELINE_STAGES_KEY,
+        ];
+        $allowedStages = $this->leadPicklists->options('current_stage');
+        foreach ($dashboardStageKeys as $key) {
+            if (! array_key_exists($key, $body)) {
+                continue;
+            }
+
+            $stages = validator(
+                ['v' => $body[$key]],
+                [
+                    'v' => 'required|array|min:1',
+                    'v.*' => ['required', 'string', Rule::in($allowedStages)],
+                ]
+            )->validate()['v'];
+
+            Setting::put($key, array_values(array_unique($stages)), 'dashboard', $request->user()->id);
+            $auditEvents[] = $key;
+        }
+
         foreach (['microsoft', 'google'] as $provider) {
             $flatKey = SsoSetting::settingKey($provider);
             if (! array_key_exists($flatKey, $body)) {
@@ -182,14 +206,15 @@ class SettingsController extends Controller
     /** @return array<string, mixed> */
     protected function generalSettingsPayload(): array
     {
-        return [
+        return array_merge([
             'crm.stale_task_days' => Setting::get('crm.stale_task_days', 5),
             'crm.qualify' => Lead::qualifyConfig(),
             'crm.inbox_enabled_roles' => InboxAccess::enabledRoleCodes(),
             'crm.inbox_role_catalog' => InboxAccess::roleCatalog(),
+            'crm.dashboard.stage_catalog' => $this->leadPicklists->options('current_stage'),
             SsoSetting::settingKey('microsoft') => SsoSetting::isProviderEnabled('microsoft'),
             SsoSetting::settingKey('google') => SsoSetting::isProviderEnabled('google'),
-        ];
+        ], DashboardConfig::all());
     }
 
     public function roles()
