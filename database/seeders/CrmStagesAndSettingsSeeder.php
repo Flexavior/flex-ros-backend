@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Crm\DashboardConfig;
 use App\Domain\Crm\LeadPicklistService;
 use App\Models\PipelineStage;
 use App\Models\Setting;
@@ -26,6 +27,9 @@ class CrmStagesAndSettingsSeeder extends Seeder
         }
 
         $this->putSettingIfMissing('crm.stale_task_days', 5, 'dashboard');
+        $this->putSettingIfMissing(DashboardConfig::MQL_STAGES_KEY, DashboardConfig::DEFAULT_MQL_STAGES, 'dashboard');
+        $this->putSettingIfMissing(DashboardConfig::SQL_STAGES_KEY, DashboardConfig::DEFAULT_SQL_STAGES, 'dashboard');
+        $this->putSettingIfMissing(DashboardConfig::PIPELINE_STAGES_KEY, DashboardConfig::DEFAULT_PIPELINE_STAGES, 'dashboard');
         $this->putSettingIfMissing('crm.client_id_prefix', 'CUS', 'crm');
         $this->putSettingIfMissing('auth.sso.microsoft_enabled', false, 'auth');
         $this->putSettingIfMissing('auth.sso.google_enabled', false, 'auth');
