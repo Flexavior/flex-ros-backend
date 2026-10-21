@@ -215,6 +215,8 @@ class SettingsAndDashboardApiTest extends TestCase
         $this->assertSame("/leads/{$lead->id}", $staleItem['route']);
         $this->assertSame('lead', $staleItem['entity_type']);
         $this->assertSame($lead->id, $staleItem['entity_id']);
+        $this->assertSame('Route Target Lead', $staleItem['entity_label']);
+        $this->assertSame($sales->name, $staleItem['assignee_name']);
     }
 
     public function test_dashboard_rep_activity_is_weekly_aggregate_only(): void
@@ -261,6 +263,40 @@ class SettingsAndDashboardApiTest extends TestCase
         $this->assertContains(0, array_column($aggregate, 'activity_count'));
         $this->assertArrayNotHasKey('rep_activity_logs', $data);
         $this->assertArrayNotHasKey('summary', $byRep[$sales->id]);
+    }
+
+    public function test_dashboard_rep_activity_excludes_senior_management(): void
+    {
+        $this->seedRoles();
+        $ceo = User::where('email', 'ceo@mss.test')->first();
+        $sales = User::where('email', 'sales@mss.test')->first();
+        $seniorMgmt = User::where('email', 'senior.mgmt@mss.test')->first();
+        $this->assertNotNull($seniorMgmt);
+
+        $lead = \App\Models\Lead::factory()->create([
+            'owner_id' => $sales->id,
+            'created_by' => $sales->id,
+        ]);
+
+        Engagement::create([
+            'lead_id' => $lead->id,
+            'user_id' => $seniorMgmt->id,
+            'summary' => 'Executive touch',
+            'occurred_at' => now()->startOfWeek()->addDay(),
+        ]);
+        Engagement::create([
+            'lead_id' => $lead->id,
+            'user_id' => $sales->id,
+            'summary' => 'Rep touch',
+            'occurred_at' => now()->startOfWeek()->addDay(),
+        ]);
+
+        $aggregate = $this->actingAs($ceo)->getJson('/api/v1/dashboard/metrics')->json('rep_activity_this_week');
+        $userIds = array_column($aggregate, 'user_id');
+
+        $this->assertContains($sales->id, $userIds);
+        $this->assertNotContains($seniorMgmt->id, $userIds);
+        $this->assertNotContains($ceo->id, $userIds);
     }
 
     public function test_dashboard_comparisons_include_qoq_and_yoy_deltas(): void

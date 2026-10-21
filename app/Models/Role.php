@@ -34,6 +34,14 @@ class Role extends Model
         self::SALES,
     ];
 
+    /** Reps shown in dashboard weekly activity (excludes executive leadership). */
+    public const DASHBOARD_REP_ACTIVITY = [
+        self::SUPERVISOR,
+        self::SENIOR_STAFF,
+        self::STAFF,
+        self::SALES,
+    ];
+
     /**
      * Roles that may own/answer an omnichannel conversation.
      * `customer_service` is seeded now so conversations can be delegated to a
